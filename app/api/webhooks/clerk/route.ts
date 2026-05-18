@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { Webhook } from "svix";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, workspaceMembers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET!;
+const DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000";
 
 export async function POST(req: NextRequest) {
   const payload = await req.text();
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
         (email_addresses as Array<{ email_address: string }>)?.[0]
           ?.email_address || `${id}@placeholder.dev`;
 
-      await db
+      const [user] = await db
         .insert(users)
         .values({
           externalId: id as string,
@@ -37,7 +38,19 @@ export async function POST(req: NextRequest) {
           name,
           avatarUrl: (image_url as string) || null,
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning();
+
+      if (user) {
+        await db
+          .insert(workspaceMembers)
+          .values({
+            workspaceId: DEFAULT_WORKSPACE_ID,
+            userId: user.id,
+            role: "admin",
+          })
+          .onConflictDoNothing();
+      }
 
       break;
     }

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { projects, workspaces, workspaceMembers } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -52,39 +52,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const clerkId = await getCurrentUserId();
+    const dbUserId = await getDbUserId();
     const body = await req.json();
     const parsed = createSchema.parse(body);
-
-    const [workspace] = await db
-      .select()
-      .from(workspaces)
-      .where(eq(workspaces.id, parsed.workspaceId));
-
-    if (!workspace) {
-      return apiError("Workspace not found", 404);
-    }
-
-    const [member] = await db
-      .select()
-      .from(workspaceMembers)
-      .where(
-        and(
-          eq(workspaceMembers.workspaceId, parsed.workspaceId),
-          eq(workspaceMembers.userId, clerkId)
-        )
-      );
-
-    if (!member) {
-      return apiError("Not a member of this workspace", 403);
-    }
 
     const [project] = await db
       .insert(projects)
       .values({
         workspaceId: parsed.workspaceId,
         teamId: parsed.teamId,
-        ownerId: clerkId,
+        ownerId: dbUserId,
         name: parsed.name,
         description: parsed.description,
         color: parsed.color,

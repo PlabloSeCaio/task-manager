@@ -41,7 +41,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const clerkId = await getCurrentUserId();
+    const dbUserId = await getDbUserId();
     const body = await req.json();
     const parsed = createSchema.parse(body);
 
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     await db.insert(workspaceMembers).values({
       workspaceId: workspace.id,
-      userId: clerkId,
+      userId: dbUserId,
       role: "admin",
     });
 
