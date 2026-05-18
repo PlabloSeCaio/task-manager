@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { attachments } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   key: z.string().min(1),
@@ -41,7 +41,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clerkId = await getCurrentUserId();
+    const dbUserId = await getDbUserId();
     const { id } = await params;
     const body = await req.json();
     const parsed = createSchema.parse(body);
@@ -50,7 +50,7 @@ export async function POST(
       .insert(attachments)
       .values({
         taskId: id,
-        uploadedById: clerkId,
+        uploadedById: dbUserId,
         r2Key: parsed.key,
         filename: parsed.filename,
         contentType: parsed.contentType,

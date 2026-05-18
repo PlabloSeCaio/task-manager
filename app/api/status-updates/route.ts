@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { statusUpdates } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   projectId: z.string().uuid().optional(),
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       .values({
         projectId: parsed.projectId,
         portfolioId: parsed.portfolioId,
-        authorId: (await getCurrentUserId()),
+        authorId: (await getDbUserId()),
         color: parsed.color || "green",
         title: parsed.title,
         body: parsed.body,

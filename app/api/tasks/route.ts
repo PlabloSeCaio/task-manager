@@ -4,7 +4,7 @@ import { tasks } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
-import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -59,6 +59,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await getCurrentUserId();
+    const dbUserId = await getDbUserId();
     const body = await req.json();
     const parsed = createSchema.parse(body);
 
@@ -70,6 +72,7 @@ export async function POST(req: NextRequest) {
         sectionId: parsed.sectionId,
         parentId: parsed.parentId,
         assigneeId: parsed.assigneeId,
+        createdById: dbUserId,
         name: parsed.name,
         notes: parsed.notes,
         htmlNotes: parsed.htmlNotes,

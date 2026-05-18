@@ -20,10 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider
-      afterSignInUrl="/home"
-      afterSignUpUrl="/home"
-    >
+    <ClerkProvider>
       <html
         lang="en"
         className={`${inter.variable} h-full antialiased`}
