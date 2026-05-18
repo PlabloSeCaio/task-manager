@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { projects, workspaces, workspaceMembers } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const dbUserId = await getDbUserId();
+    await ensureDefaultWorkspace();
     const body = await req.json();
     const parsed = createSchema.parse(body);
 
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError("Unauthorized", 401);
     }
-    return apiError("Internal server error", 500);
+    const msg = error instanceof Error ? error.message : "Internal server error";
+    return apiError(msg, 500);
   }
 }

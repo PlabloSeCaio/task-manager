@@ -44,6 +44,7 @@ export default function ProjectsPage() {
   const [color, setColor] = useState("blue");
   const [defaultView, setDefaultView] = useState<string>("list");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   const fetchProjects = async () => {
     try {
@@ -66,6 +67,7 @@ export default function ProjectsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
+    setCreateError("");
     try {
       const res = await fetch("/api/projects", {
         method: "POST",
@@ -86,9 +88,11 @@ export default function ProjectsPage() {
         setColor("blue");
         setDefaultView("list");
         await fetchProjects();
+      } else {
+        setCreateError(json.error || "Failed to create project");
       }
     } catch (err) {
-      console.error("Failed to create project", err);
+      setCreateError("Network error — please try again");
     } finally {
       setCreating(false);
     }
@@ -192,6 +196,9 @@ export default function ProjectsPage() {
                   </div>
                 </div>
               </div>
+              {createError && (
+                <p className="text-sm text-destructive">{createError}</p>
+              )}
               <DialogFooter>
                 <Button
                   type="button"
