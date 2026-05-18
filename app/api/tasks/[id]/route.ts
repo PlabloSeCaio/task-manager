@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { runAutomations } from "@/lib/automation-engine";
 import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
@@ -90,6 +91,8 @@ export async function PATCH(
     if (!updated) {
       return apiError("Task not found", 404);
     }
+
+    runAutomations(id, parsed).catch(console.error);
 
     return apiSuccess(updated);
   } catch (error) {

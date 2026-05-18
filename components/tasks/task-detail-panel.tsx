@@ -9,7 +9,9 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Calendar,
@@ -19,7 +21,15 @@ import {
   CheckCircle2,
   Clock,
   Trash2,
+  Heart,
+  Users,
+  Link2,
 } from "lucide-react";
+import { FileUploader } from "@/components/shared/file-uploader";
+import { TagPicker } from "@/components/shared/tag-picker";
+import { CustomFieldsPanel } from "@/components/shared/custom-fields-panel";
+import { SubtaskList } from "@/components/tasks/subtask-list";
+import { cn } from "@/lib/utils";
 import type { Task, Comment, Attachment } from "@/types";
 
 interface TaskDetailPanelProps {
@@ -38,8 +48,10 @@ export function TaskDetailPanel({
   const [task, setTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
+  const [notes, setNotes] = useState("");
 
   const fetchTask = async () => {
     setLoading(true);
@@ -52,7 +64,10 @@ export function TaskDetailPanel({
       const taskJson = await taskRes.json();
       const commentsJson = await commentsRes.json();
       const attachmentsJson = await attachmentsRes.json();
-      if (taskJson.data) setTask(taskJson.data);
+      if (taskJson.data) {
+        setTask(taskJson.data);
+        setNotes(taskJson.data.notes || "");
+      }
       if (commentsJson.data) setComments(commentsJson.data);
       if (attachmentsJson.data) setAttachments(attachmentsJson.data);
     } catch (err) {
@@ -105,6 +120,12 @@ export function TaskDetailPanel({
     }
   };
 
+  const handleNotesBlur = () => {
+    if (notes !== (task?.notes || "")) {
+      handleUpdate({ notes });
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -126,18 +147,34 @@ export function TaskDetailPanel({
                     className="border-0 p-0 text-lg font-semibold focus-visible:ring-0"
                   />
                 </SheetTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleDelete}
-                  className="text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setFollowing(!following);
+                    }}
+                  >
+                    <Heart
+                      className={cn(
+                        "size-4",
+                        following && "fill-red-500 text-red-500"
+                      )}
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </div>
             </SheetHeader>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant={task.completed ? "default" : "outline"}
                 size="sm"
@@ -148,49 +185,93 @@ export function TaskDetailPanel({
                 <CheckCircle2 className="mr-1 size-4" />
                 {task.completed ? "Completed" : "Mark Complete"}
               </Button>
+
+              <Button variant="outline" size="sm">
+                <Link2 className="mr-1 size-4" />
+                Copy link
+              </Button>
             </div>
 
-            <div className="space-y-3">
+            <TagPicker
+              taskId={taskId}
+              workspaceId={task.workspaceId}
+            />
+
+            <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/30 p-4">
               <div className="flex items-center gap-3 text-sm">
-                <User className="size-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Assignee:</span>
-                <span>{task.assigneeId || "Unassigned"}</span>
-              </div>
-
-              <div className="flex items-center gap-3 text-sm">
-                <Calendar className="size-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Due date:</span>
-                <span>
-                  {task.dueOn
-                    ? new Date(task.dueOn).toLocaleDateString()
-                    : "No due date"}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 text-sm">
-                <Clock className="size-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Created:</span>
-                <span>
-                  {task.createdAt ? new Date(task.createdAt).toLocaleDateString() : "Unknown"}
-                </span>
-              </div>
-
-              {task.subtype !== "default" && (
-                <Badge variant="secondary">{task.subtype}</Badge>
-              )}
-            </div>
-
-            {task.notes && (
-              <>
-                <Separator />
+                <User className="size-4 shrink-0 text-muted-foreground" />
                 <div>
-                  <h4 className="mb-2 text-sm font-medium">Notes</h4>
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {task.notes}
+                  <p className="text-xs text-muted-foreground">Assignee</p>
+                  <p>{task.assigneeId ? "Assigned" : "Unassigned"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 text-sm">
+                <Calendar className="size-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Due date</p>
+                  <p>
+                    {task.dueOn
+                      ? new Date(task.dueOn).toLocaleDateString()
+                      : "No due date"}
                   </p>
                 </div>
-              </>
+              </div>
+
+              <div className="flex items-center gap-3 text-sm">
+                <Clock className="size-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Created</p>
+                  <p>
+                    {task.createdAt
+                      ? new Date(task.createdAt).toLocaleDateString()
+                      : "Unknown"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 text-sm">
+                <Users className="size-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Subtype</p>
+                  <p className="capitalize">{task.subtype || "Default"}</p>
+                </div>
+              </div>
+            </div>
+
+            {task.subtype !== "default" && (
+              <Badge variant="secondary">{task.subtype}</Badge>
             )}
+
+            <Separator />
+
+            <div>
+              <h4 className="mb-2 text-sm font-medium">Notes</h4>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={handleNotesBlur}
+                placeholder="Add notes..."
+                className="min-h-[100px] resize-y"
+              />
+            </div>
+
+            <Separator />
+
+            <SubtaskList
+              taskId={taskId}
+              workspaceId={task.workspaceId}
+              projectId={task.projectId}
+              sectionId={task.sectionId}
+              onUpdate={onUpdate}
+            />
+
+            <Separator />
+
+            <CustomFieldsPanel
+              taskId={taskId}
+              projectId={task.projectId}
+            />
 
             <Separator />
 
@@ -199,25 +280,37 @@ export function TaskDetailPanel({
                 <Paperclip className="size-4" />
                 Attachments ({attachments.length})
               </h4>
-              {attachments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No attachments</p>
-              ) : (
+
+              <div className="mb-3">
+                <FileUploader
+                  taskId={taskId}
+                  onUploadComplete={fetchTask}
+                />
+              </div>
+
+              {attachments.length > 0 ? (
                 <div className="space-y-2">
                   {attachments.map((att) => (
                     <div
                       key={att.id}
                       className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2"
                     >
-                      <Paperclip className="size-4 text-muted-foreground" />
-                      <span className="text-sm">{att.filename}</span>
+                      <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 truncate text-sm">
+                        {att.filename}
+                      </span>
                       {att.sizeBytes && (
                         <span className="text-xs text-muted-foreground">
-                          ({(att.sizeBytes / 1024).toFixed(1)} KB)
+                          {(att.sizeBytes / 1024).toFixed(0)} KB
                         </span>
                       )}
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No attachments yet
+                </p>
               )}
             </div>
 
@@ -229,18 +322,40 @@ export function TaskDetailPanel({
                 Comments ({comments.length})
               </h4>
 
-              <div className="mb-4 space-y-3">
-                {comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="rounded-md bg-muted/50 p-3"
-                  >
-                    <p className="text-sm">{comment.body}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ""}
-                    </p>
-                  </div>
-                ))}
+              <div className="mb-4 max-h-64 space-y-3 overflow-y-auto">
+                {comments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No comments yet
+                  </p>
+                ) : (
+                  comments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="flex gap-3 rounded-md bg-muted/50 p-3"
+                    >
+                      <Avatar className="size-8">
+                        <AvatarFallback className="text-xs">
+                          U
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            User
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {comment.createdAt
+                              ? new Date(
+                                  comment.createdAt
+                                ).toLocaleString()
+                              : ""}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm">{comment.body}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -249,7 +364,10 @@ export function TaskDetailPanel({
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddComment();
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddComment();
+                    }
                   }}
                 />
                 <Button

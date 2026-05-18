@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { z } from "zod";
+import { runAutomations } from "@/lib/automation-engine";
 import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
@@ -77,6 +78,10 @@ export async function POST(req: NextRequest) {
         dueOn: parsed.dueOn ? new Date(parsed.dueOn) : null,
       })
       .returning();
+
+    if (task) {
+      runAutomations(task.id, { id: task.id, ...parsed }).catch(console.error);
+    }
 
     return apiSuccess(task, 201);
   } catch (error) {

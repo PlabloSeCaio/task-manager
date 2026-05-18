@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LayoutList, Columns3, Calendar, GitBranch, Plus } from "lucide-react";
 import { ProjectHeader } from "@/components/projects/project-header";
+import { AutomationRulesModal } from "@/components/projects/automation-rules-modal";
+import { StatusUpdateForm } from "@/components/projects/status-update-form";
 import type { Project } from "@/types";
 
 const tabs = [
@@ -26,6 +28,8 @@ export default function ProjectLayout({
   const router = useRouter();
   const projectId = params.projectId as string;
   const [project, setProject] = useState<Project | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const currentTab = pathname.split("/").pop() || "list";
 
@@ -40,7 +44,13 @@ export default function ProjectLayout({
 
   return (
     <div className="flex h-full flex-col">
-      {project && <ProjectHeader project={project} />}
+      {project && (
+        <ProjectHeader
+          project={project}
+          onOpenRules={() => setRulesOpen(true)}
+          onOpenStatusUpdate={() => setStatusOpen(true)}
+        />
+      )}
 
       <div className="flex items-center gap-1 border-b px-6">
         {tabs.map((tab) => {
@@ -71,6 +81,22 @@ export default function ProjectLayout({
       </div>
 
       <div className="flex-1 overflow-auto">{children}</div>
+
+      {project && (
+        <>
+          <AutomationRulesModal
+            projectId={projectId}
+            open={rulesOpen}
+            onOpenChange={setRulesOpen}
+          />
+          <StatusUpdateForm
+            projectId={projectId}
+            open={statusOpen}
+            onOpenChange={setStatusOpen}
+            onUpdate={() => {}}
+          />
+        </>
+      )}
     </div>
   );
 }

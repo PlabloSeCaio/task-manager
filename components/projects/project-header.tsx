@@ -4,7 +4,17 @@ import type { Project } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Settings, MoreHorizontal } from "lucide-react";
 
-export function ProjectHeader({ project }: { project: Project }) {
+interface ProjectHeaderProps {
+  project: Project;
+  onOpenRules?: () => void;
+  onOpenStatusUpdate?: () => void;
+}
+
+export function ProjectHeader({
+  project,
+  onOpenRules,
+  onOpenStatusUpdate,
+}: ProjectHeaderProps) {
   const dotColors: Record<string, string> = {
     blue: "bg-blue-500",
     green: "bg-green-500",
@@ -30,11 +40,11 @@ export function ProjectHeader({ project }: { project: Project }) {
         </span>
       )}
       <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="icon">
-          <Settings className="size-4" />
-        </Button>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" onClick={onOpenStatusUpdate}>
           <MoreHorizontal className="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={onOpenRules}>
+          <Settings className="size-4" />
         </Button>
       </div>
     </div>
