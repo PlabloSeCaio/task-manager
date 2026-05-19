@@ -20,8 +20,8 @@ const updateSchema = z.object({
     .enum(["pending", "approved", "rejected", "changes_requested"])
     .nullable()
     .optional(),
-  startOn: z.string().datetime().nullable().optional(),
-  dueOn: z.string().datetime().nullable().optional(),
+  startOn: z.string().nullable().optional(),
+  dueOn: z.string().nullable().optional(),
   position: z.number().int().optional(),
   liked: z.boolean().optional(),
 });

@@ -16,8 +16,8 @@ const createSchema = z.object({
   notes: z.string().optional(),
   htmlNotes: z.string().optional(),
   subtype: z.enum(["default", "milestone", "approval"]).optional(),
-  startOn: z.string().datetime().optional(),
-  dueOn: z.string().datetime().optional(),
+  startOn: z.string().optional(),
+  dueOn: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {

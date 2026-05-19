@@ -669,41 +669,56 @@ export function TaskDetailPanel({
           </div>
 
           <div className="max-h-48 overflow-y-auto px-5 py-3">
-            {activityTab === "activity" && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <Avatar className="size-6">
-                  <AvatarFallback className="text-[9px]">U</AvatarFallback>
-                </Avatar>
-                <p>
-                  <span className="font-medium text-foreground">User</span> created this task &middot;{" "}
-                  {t.createdAt
-                    ? formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })
-                    : "recently"}
-                </p>
-              </div>
-            )}
+            {activityTab === "activity" && (() => {
+              const creator = users.find((u) => u.id === t.createdById);
+              return (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Avatar className="size-6">
+                    <AvatarFallback className="text-[9px]">
+                      {creator ? creator.name?.charAt(0)?.toUpperCase() || "?" : "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <p>
+                    <span className="font-medium text-foreground">
+                      {creator?.name || creator?.email || "Unknown"}
+                    </span>{" "}
+                    created this task &middot;{" "}
+                    {t.createdAt
+                      ? formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })
+                      : "recently"}
+                  </p>
+                </div>
+              );
+            })()}
 
             {activityTab === "comments" && (
               <div className="space-y-3">
                 {comments.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No comments yet</p>
                 ) : (
-                  comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-2">
-                      <Avatar className="size-6 shrink-0">
-                        <AvatarFallback className="text-[9px]">U</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium">User</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {comment.createdAt ? format(new Date(comment.createdAt), "MMM d, yyyy") : ""}
-                          </span>
+                  comments.map((comment) => {
+                    const author = users.find((u) => u.id === comment.authorId);
+                    return (
+                      <div key={comment.id} className="flex gap-2">
+                        <Avatar className="size-6 shrink-0">
+                          <AvatarFallback className="text-[9px]">
+                            {author ? author.name?.charAt(0)?.toUpperCase() || "?" : "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium">
+                              {author?.name || author?.email || "Unknown"}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {comment.createdAt ? format(new Date(comment.createdAt), "MMM d, yyyy") : ""}
+                            </span>
+                          </div>
+                          <p className="text-sm">{comment.body}</p>
                         </div>
-                        <p className="text-sm">{comment.body}</p>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -711,7 +726,9 @@ export function TaskDetailPanel({
 
           <div className="flex items-start gap-2 border-t px-5 py-3">
             <Avatar className="size-7 shrink-0">
-              <AvatarFallback className="text-xs">U</AvatarFallback>
+              <AvatarFallback className="text-xs">
+                {users[0] ? (users[0].name?.charAt(0)?.toUpperCase() || "?") : "?"}
+              </AvatarFallback>
             </Avatar>
             <div className="flex-1 flex gap-2">
               <input

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,6 +15,7 @@ import {
 import {
   SortableContext,
   verticalListSortingStrategy,
+  arrayMove,
 } from "@dnd-kit/sortable";
 import { useParams } from "next/navigation";
 import { Plus, MoreHorizontal } from "lucide-react";
@@ -24,7 +25,7 @@ import { TaskCard } from "@/components/tasks/task-card";
 import { InlineTaskComposer } from "@/components/tasks/inline-task-composer";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 import { cn } from "@/lib/utils";
-import type { Section, Task } from "@/types";
+import type { Section, Task, User } from "@/types";
 
 interface Column {
   id: string;
@@ -37,11 +38,15 @@ export function BoardView() {
   const projectId = params.projectId as string;
   const [sections, setSections] = useState<Section[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [newSectionName, setNewSectionName] = useState("");
   const [addingSection, setAddingSection] = useState(false);
+  const tasksRef = useRef(tasks);
+
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -50,14 +55,17 @@ export function BoardView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [sectionsRes, tasksRes] = await Promise.all([
+      const [sectionsRes, tasksRes, usersRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/sections`),
         fetch(`/api/tasks?projectId=${projectId}`),
+        fetch("/api/users"),
       ]);
       const sJson = await sectionsRes.json();
       const tJson = await tasksRes.json();
+      const uJson = await usersRes.json();
       if (sJson.data) setSections(sJson.data);
       if (tJson.data) setTasks(tJson.data);
+      if (uJson.data) setUsers(uJson.data);
     } finally {
       setLoading(false);
     }
@@ -66,6 +74,23 @@ export function BoardView() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleToggleComplete = useCallback(async (task: Task) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t))
+    );
+    try {
+      await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !task.completed }),
+      });
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, completed: task.completed } : t))
+      );
+    }
+  }, []);
 
   const columns: Column[] = useMemo(() => {
     const cols: Column[] = sections.map((s) => ({
@@ -97,42 +122,73 @@ export function BoardView() {
     if (task) setActiveTask(task);
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const activeTaskData = tasks.find((t) => t.id === active.id);
+    const prevTasks = [...tasksRef.current];
+    const activeTaskData = prevTasks.find((t) => t.id === active.id);
     if (!activeTaskData) return;
 
     let newSectionId: string | null = null;
+    let newPosition = 0;
 
-    const overTask = tasks.find((t) => t.id === over.id);
+    const overTask = prevTasks.find((t) => t.id === over.id);
     if (overTask) {
       newSectionId = overTask.sectionId || null;
+      const sameColumn = prevTasks
+        .filter((t) => t.sectionId === newSectionId && !t.parentId)
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
+      const overIndex = sameColumn.findIndex((t) => t.id === over.id);
+      newPosition = overIndex >= 0 ? overIndex : 0;
     } else {
       const overColumn = columns.find((c) => c.id === over.id);
       if (overColumn) {
         newSectionId = overColumn.id === "unsorted" ? null : overColumn.id;
+        newPosition = overColumn.tasks.length;
       }
     }
 
-    if (newSectionId !== activeTaskData.sectionId) {
-      try {
-        await fetch(`/api/tasks/${active.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sectionId: newSectionId,
-            position: 0,
-          }),
-        });
-        await fetchData();
-      } catch (err) {
-        console.error("Failed to move task", err);
+    if (newSectionId === undefined) return;
+
+    setTasks((prev) => {
+      let updated = prev.map((t) =>
+        t.id === active.id
+          ? { ...t, sectionId: newSectionId, position: newPosition }
+          : t
+      );
+
+      if (activeTaskData.sectionId === newSectionId && overTask) {
+        const sameCol = updated.filter(
+          (t) => t.sectionId === newSectionId && !t.parentId
+        );
+        const oldIdx = sameCol.findIndex((t) => t.id === active.id);
+        const newIdx = sameCol.findIndex((t) => t.id === over.id);
+        if (oldIdx >= 0 && newIdx >= 0) {
+          const reordered = arrayMove(sameCol, oldIdx, newIdx);
+          const ids = new Set(reordered.map((t) => t.id));
+          const rest = updated.filter((t) => !ids.has(t.id) || t.parentId);
+          updated = [...rest, ...reordered];
+        }
       }
+
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/tasks/${active.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sectionId: newSectionId,
+          position: newPosition,
+        }),
+      });
+    } catch {
+      setTasks(prevTasks);
     }
-  };
+  }, [columns]);
 
   const handleCreateSection = async () => {
     if (!newSectionName.trim()) return;
@@ -195,7 +251,9 @@ export function BoardView() {
                     <TaskCard
                       key={task.id}
                       task={task}
+                      users={users}
                       onClick={() => setSelectedTaskId(task.id)}
+                      onToggleComplete={handleToggleComplete}
                     />
                   ))}
                 </div>
@@ -259,7 +317,7 @@ export function BoardView() {
 
         <DragOverlay>
           {activeTask && (
-            <div className="rounded-lg border bg-card p-3 shadow-lg">
+            <div className="rounded-lg border bg-card p-3 shadow-lg ring-2 ring-primary/20">
               <p className="text-sm font-medium">{activeTask.name}</p>
             </div>
           )}
