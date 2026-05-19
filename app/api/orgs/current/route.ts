@@ -13,6 +13,7 @@ export async function GET() {
 
     const orgId = session.orgId;
 
+    // If user has an active Clerk org, try to find a mapped workspace
     if (orgId) {
       const [ws] = await db
         .select({
@@ -32,9 +33,28 @@ export async function GET() {
           orgId,
         });
       }
+
+      // Auto-link: if org exists but no mapping yet, link the default workspace
+      const [defaultWs] = await db
+        .select({ id: workspaces.id, name: workspaces.name })
+        .from(workspaces)
+        .where(eq(workspaces.id, DEFAULT_WORKSPACE_ID));
+
+      if (defaultWs) {
+        await db
+          .update(workspaces)
+          .set({ clerkOrganizationId: orgId })
+          .where(eq(workspaces.id, DEFAULT_WORKSPACE_ID));
+
+        return apiSuccess({
+          workspaceId: DEFAULT_WORKSPACE_ID,
+          workspaceName: defaultWs.name || "My Workspace",
+          orgId,
+        });
+      }
     }
 
-    // Fallback: no org selected or org not mapped yet — use default
+    // Fallback: no org selected — use default
     const [defaultWs] = await db
       .select({
         id: workspaces.id,

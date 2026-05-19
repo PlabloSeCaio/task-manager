@@ -78,7 +78,7 @@ export default function HomePage() {
   const [taskTab, setTaskTab] = useState<"upcoming" | "overdue" | "completed">("upcoming");
 
   useEffect(() => {
-    if (!workspaceId) return;
+    let cancelled = false;
     async function init() {
       try {
         const [meRes, tasksRes, usersRes] = await Promise.all([
@@ -91,6 +91,8 @@ export default function HomePage() {
         const tasksJson = await tasksRes.json();
         const usersJson = await usersRes.json();
 
+        if (cancelled) return;
+
         const me: User | undefined = meJson.data;
         const tasks: Task[] = tasksJson.data || [];
         const users: User[] = usersJson.data || [];
@@ -101,16 +103,19 @@ export default function HomePage() {
 
         if (me) setAllUsers((prev) => (prev.find((u) => u.id === me.id) ? prev : [me, ...prev]));
 
-        const projRes = await fetch(`/api/projects?workspaceId=${workspaceId}`);
-        const projJson = await projRes.json();
-        setProjects(projJson.data || []);
+        if (workspaceId) {
+          const projRes = await fetch(`/api/projects?workspaceId=${workspaceId}`);
+          const projJson = await projRes.json();
+          if (!cancelled) setProjects(projJson.data || []);
+        }
       } catch (err) {
         console.error("Failed to load dashboard", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     init();
+    return () => { cancelled = true; };
   }, [workspaceId]);
 
   const myTasks = useMemo(

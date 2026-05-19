@@ -38,16 +38,19 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch("/api/orgs/current");
       const json = await res.json();
-      if (json.data) {
-        setValue({
-          workspaceId: json.data.workspaceId,
-          orgId: json.data.orgId,
-          workspaceName: json.data.workspaceName,
-          isLoading: false,
-        });
-      }
+      setValue({
+        workspaceId: json.data?.workspaceId || "00000000-0000-0000-0000-000000000000",
+        orgId: json.data?.orgId || null,
+        workspaceName: json.data?.workspaceName || null,
+        isLoading: false,
+      });
     } catch {
-      setValue((prev) => ({ ...prev, isLoading: false }));
+      setValue({
+        workspaceId: "00000000-0000-0000-0000-000000000000",
+        orgId: null,
+        workspaceName: null,
+        isLoading: false,
+      });
     }
   }, []);
 

@@ -61,7 +61,6 @@ export default function ProjectsPage() {
   };
 
   useEffect(() => {
-    if (!workspaceId) return;
     fetchProjects();
   }, [workspaceId]);
 
@@ -74,7 +73,6 @@ export default function ProjectsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspaceId,
           name,
           description,
           color,
@@ -109,8 +107,6 @@ export default function ProjectsPage() {
     orange: "border-l-orange-500",
     teal: "border-l-teal-500",
   };
-
-  if (!workspaceId) return null;
 
   if (loading) {
     return (
