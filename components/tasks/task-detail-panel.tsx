@@ -146,7 +146,7 @@ export function TaskDetailPanel({
   };
 
   const assignedUser = users.find((u) => u.id === task?.assigneeId);
-  const projectColor = task ? getProjectColor(task.projectId) : "bg-blue-500";
+  const projectColor = task && task.projectId ? getProjectColor(task.projectId) : "bg-blue-500";
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
