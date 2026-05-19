@@ -4,7 +4,7 @@ import { tasks } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
-import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
   try {
     await getCurrentUserId();
     const dbUserId = await getDbUserId();
+    await ensureDefaultWorkspace();
     const body = await req.json();
     const parsed = createSchema.parse(body);
 

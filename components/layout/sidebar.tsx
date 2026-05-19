@@ -5,104 +5,185 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  Inbox,
-  FolderKanban,
-  PieChart,
-  Target,
-  Settings,
-  ChevronDown,
   ListChecks,
+  Inbox,
+  Settings,
+  Plus,
+  ChevronDown,
   X,
 } from "lucide-react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/layout/sidebar-context";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import type { Project } from "@/types";
 
-const navItems = [
+const navTop = [
   { href: "/home", label: "Home", icon: LayoutDashboard },
   { href: "/my-tasks", label: "My Tasks", icon: ListChecks },
   { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/portfolios", label: "Portfolios", icon: PieChart },
-  { href: "/goals", label: "Goals", icon: Target },
 ];
+
+const projectColors: Record<string, string> = {
+  blue: "bg-blue-500",
+  green: "bg-green-500",
+  red: "bg-red-500",
+  yellow: "bg-yellow-500",
+  purple: "bg-purple-500",
+  pink: "bg-pink-500",
+  orange: "bg-orange-500",
+  teal: "bg-teal-500",
+};
+
+const colorOptions = ["blue", "teal", "purple", "yellow", "orange", "pink", "green"];
+
+function getProjectColor(color?: string | null, index = 0): string {
+  if (color && projectColors[color]) return projectColors[color];
+  return projectColors[colorOptions[index % colorOptions.length]];
+}
+
+function getProjectInitial(name: string): string {
+  return name.charAt(0).toUpperCase();
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const { mobileOpen, setMobileOpen } = useSidebar();
-  const [collapsed, setCollapsed] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    fetch("/api/projects?workspaceId=00000000-0000-0000-0000-000000000000")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.data) setProjects(json.data);
+      })
+      .catch(() => {});
+  }, []);
 
   const sidebarContent = (
     <>
-      <div className="flex items-center gap-2 border-b p-4">
-        <OrganizationSwitcher
-          appearance={{
-            elements: {
-              organizationSwitcherTrigger: {
-                padding: "4px",
-                borderRadius: "6px",
-              },
-            },
-          }}
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto size-6 max-md:hidden"
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          <ChevronDown
-            className={cn(
-              "size-4 transition-transform",
-              collapsed && "-rotate-90"
-            )}
-          />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto size-6 md:hidden"
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <button
+          className="flex size-7 items-center justify-center rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
           onClick={() => setMobileOpen(false)}
         >
           <X className="size-4" />
-        </Button>
+        </button>
+        <div className="flex-1" />
+        <button className="inline-flex items-center gap-1.5 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1 text-xs font-medium text-sidebar-foreground hover:bg-sidebar-accent/80 transition-colors">
+          <span className="flex size-4 items-center justify-center rounded-full bg-red-500 text-white">
+            <Plus className="size-3" />
+          </span>
+          Create
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname.startsWith(item.href);
-          return (
+      <nav className="flex-1 overflow-y-auto px-2 py-1">
+        <div className="space-y-0.5">
+          {navTop.map((item) => {
+            const Icon = item.icon;
+            const active = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 mb-1 flex items-center justify-between px-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+            Projects
+          </span>
+          <Link href="/projects" onClick={() => setMobileOpen(false)}>
+            <Plus className="size-3.5 text-sidebar-foreground/40 hover:text-sidebar-foreground" />
+          </Link>
+        </div>
+
+        <div className="space-y-0.5">
+          {projects.map((project, i) => {
+            const active = pathname.startsWith(`/projects/${project.id}`);
+            return (
+              <Link
+                key={project.id}
+                href={`/projects/${project.id}/list`}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-bold text-white",
+                    getProjectColor(project.color, i)
+                  )}
+                >
+                  {getProjectInitial(project.name)}
+                </span>
+                <span className="truncate">{project.name}</span>
+              </Link>
+            );
+          })}
+          {projects.length === 0 && (
             <Link
-              key={item.href}
-              href={item.href}
+              href="/projects"
               onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-              )}
+              className="flex items-center gap-3 rounded-md px-3 py-1.5 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
             >
-              <Icon className="size-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              <span className="flex size-5 shrink-0 items-center justify-center rounded border border-dashed border-sidebar-border text-[10px]">
+                <Plus className="size-3" />
+              </span>
+              <span>Add project</span>
             </Link>
-          );
-        })}
+          )}
+        </div>
       </nav>
 
-      <div className="border-t p-3">
+      <div className="border-t border-sidebar-border px-3 py-2.5">
         <div className="flex items-center gap-3">
-          <UserButton />
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Settings</span>
-              <Link href="/settings/profile" onClick={() => setMobileOpen(false)}>
-                <Settings className="size-4 text-muted-foreground hover:text-foreground" />
-              </Link>
-            </div>
-          )}
+          <UserButton
+            appearance={{
+              elements: {
+                userButtonAvatarBox: { width: "24px", height: "24px" },
+              },
+            }}
+          />
+          <OrganizationSwitcher
+            appearance={{
+              elements: {
+                organizationSwitcherTrigger: {
+                  padding: "2px",
+                  borderRadius: "4px",
+                  fontSize: "13px",
+                  color: "inherit",
+                },
+                organizationSwitcherTriggerIcon: { width: "14px", height: "14px" },
+              },
+            }}
+          />
+          <div className="ml-auto flex items-center gap-1">
+            <Link
+              href="/settings/profile"
+              onClick={() => setMobileOpen(false)}
+              className="flex size-6 items-center justify-center rounded text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+            >
+              <Settings className="size-3.5" />
+            </Link>
+          </div>
         </div>
       </div>
     </>
@@ -110,7 +191,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -118,24 +198,17 @@ export function Sidebar() {
         />
       )}
 
-      {/* Mobile sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r bg-background transition-transform md:hidden",
-          collapsed ? "w-16" : "w-60",
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-sidebar-border bg-sidebar transition-transform md:hidden",
+          "w-60",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         {sidebarContent}
       </aside>
 
-      {/* Desktop sidebar */}
-      <aside
-        className={cn(
-          "hidden md:flex flex-col border-r bg-muted/30 transition-all",
-          collapsed ? "w-16" : "w-60"
-        )}
-      >
+      <aside className="hidden md:flex w-56 flex-col border-r border-sidebar-border bg-sidebar">
         {sidebarContent}
       </aside>
     </>

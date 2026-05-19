@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { LayoutList, Columns3, Calendar, GitBranch, Plus } from "lucide-react";
 import { ProjectHeader } from "@/components/projects/project-header";
@@ -30,6 +39,9 @@ export default function ProjectLayout({
   const [project, setProject] = useState<Project | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const currentTab = pathname.split("/").pop() || "list";
 
@@ -73,12 +85,71 @@ export default function ProjectLayout({
           );
         })}
         <div className="ml-auto">
-          <Button size="sm">
+          <Button size="sm" onClick={() => setAddTaskOpen(true)}>
             <Plus className="mr-1 size-4" />
             Add Task
           </Button>
         </div>
       </div>
+
+      <Dialog open={addTaskOpen} onOpenChange={setAddTaskOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Task</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newTaskName.trim()) return;
+              setCreatingTask(true);
+              try {
+                await fetch("/api/tasks", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    workspaceId: "00000000-0000-0000-0000-000000000000",
+                    projectId,
+                    name: newTaskName.trim(),
+                  }),
+                });
+                setNewTaskName("");
+                setAddTaskOpen(false);
+                router.refresh();
+              } catch (err) {
+                console.error("Failed to create task", err);
+              } finally {
+                setCreatingTask(false);
+              }
+            }}
+          >
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="task-name">Task name</Label>
+                <Input
+                  id="task-name"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  placeholder="What needs to be done?"
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddTaskOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creatingTask}>
+                {creatingTask ? "Adding..." : "Add Task"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex-1 overflow-auto">{children}</div>
 

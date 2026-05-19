@@ -42,6 +42,8 @@ export function BoardView() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [newSectionName, setNewSectionName] = useState("");
   const [addingSection, setAddingSection] = useState(false);
+  const [newTaskNames, setNewTaskNames] = useState<Record<string, string>>({});
+  const [addingTaskColumn, setAddingTaskColumn] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -134,6 +136,28 @@ export function BoardView() {
     }
   };
 
+  const handleCreateTask = async (sectionId: string) => {
+    const name = newTaskNames[sectionId]?.trim();
+    if (!name) return;
+    try {
+      await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: "00000000-0000-0000-0000-000000000000",
+          projectId,
+          sectionId,
+          name,
+        }),
+      });
+      setNewTaskNames((prev) => ({ ...prev, [sectionId]: "" }));
+      setAddingTaskColumn(null);
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to create task", err);
+    }
+  };
+
   const handleCreateSection = async () => {
     if (!newSectionName.trim()) return;
     try {
@@ -202,14 +226,59 @@ export function BoardView() {
               </SortableContext>
 
               <div className="px-2 pb-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-muted-foreground"
-                >
-                  <Plus className="mr-1 size-3" />
-                  Add task
-                </Button>
+                {addingTaskColumn === column.id ? (
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      placeholder="Task name..."
+                      value={newTaskNames[column.id] || ""}
+                      onChange={(e) =>
+                        setNewTaskNames((prev) => ({
+                          ...prev,
+                          [column.id]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleCreateTask(column.id);
+                        if (e.key === "Escape") {
+                          setAddingTaskColumn(null);
+                          setNewTaskNames((prev) => ({ ...prev, [column.id]: "" }));
+                        }
+                      }}
+                      autoFocus
+                      className="h-8 text-sm"
+                      onBlur={() => {
+                        if (!newTaskNames[column.id]?.trim()) {
+                          setAddingTaskColumn(null);
+                        }
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleCreateTask(column.id)}>
+                        Add
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setAddingTaskColumn(null);
+                          setNewTaskNames((prev) => ({ ...prev, [column.id]: "" }));
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-muted-foreground"
+                    onClick={() => setAddingTaskColumn(column.id)}
+                  >
+                    <Plus className="mr-1 size-3" />
+                    Add task
+                  </Button>
+                )}
               </div>
             </div>
           ))}
