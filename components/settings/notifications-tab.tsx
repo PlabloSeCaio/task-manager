@@ -146,8 +146,8 @@ export function NotificationsTab() {
   }
 
   return (
-    <div className="space-y-3">
-      <Accordion.Root defaultValue={[]} className="space-y-2">
+    <div className="px-8 py-6">
+      <Accordion.Root defaultValue={[]} className="space-y-3">
         {/* Browser Notifications */}
         <AccPanel title="Browser notifications" subtitle="Customize what notifications you receive in your browser">
           <NotifGroup label="Updates on your work">
