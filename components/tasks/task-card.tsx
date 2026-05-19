@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, CalendarDays, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
 
@@ -32,7 +32,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       style={style}
       {...attributes}
       className={cn(
-        "group rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md",
+        "group rounded-lg border bg-card px-3 py-2 shadow-sm transition-shadow hover:shadow-md cursor-pointer",
         isDragging && "z-50 opacity-50 shadow-lg",
         task.completed && "opacity-60"
       )}
@@ -40,25 +40,29 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       <div className="flex items-start gap-2">
         <button
           {...listeners}
-          className="mt-0.5 cursor-grab text-muted-foreground/30 hover:text-muted-foreground touch-none"
+          className="mt-0.5 cursor-grab text-muted-foreground/30 hover:text-muted-foreground touch-none shrink-0"
         >
-          <GripVertical className="size-4" />
+          <GripVertical className="size-3.5" />
         </button>
         <div className="flex-1 min-w-0" onClick={onClick}>
           <p
             className={cn(
-              "text-sm font-medium",
+              "text-sm",
               task.completed && "line-through text-muted-foreground"
             )}
           >
             {task.name}
           </p>
           {task.dueOn && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {new Date(task.dueOn).toLocaleDateString()}
-            </p>
+            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <CalendarDays className="size-3" />
+              <span>{new Date(task.dueOn).toLocaleDateString()}</span>
+            </div>
           )}
         </div>
+        {task.completed && (
+          <CheckCircle2 className="size-4 shrink-0 text-green-500 mt-0.5" />
+        )}
       </div>
     </div>
   );
