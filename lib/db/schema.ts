@@ -392,8 +392,7 @@ export const userSettings = pgTable("user_settings", {
     .notNull()
     .unique()
     .references(() => users.externalId, { onDelete: "cascade" }),
-  pronouns: text("pronouns"),
-  namePronunciation: text("name_pronunciation"),
+  nickname: text("nickname"),
   jobTitle: text("job_title"),
   department: text("department"),
   about: text("about"),

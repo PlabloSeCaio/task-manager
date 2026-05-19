@@ -13,11 +13,7 @@ import { PlaceholderTab } from "./placeholder-tab"
 const tabs = [
   { id: "profile", label: "Profile" },
   { id: "notifications", label: "Notifications" },
-  { id: "email-forwarding", label: "Email Forwarding" },
   { id: "account", label: "Account" },
-  { id: "display", label: "Display" },
-  { id: "apps", label: "Apps" },
-  { id: "hacks", label: "Hacks" },
 ]
 
 export function SettingsModal() {
@@ -62,20 +58,8 @@ export function SettingsModal() {
           <Tabs.Panel value="notifications" className="p-6">
             <NotificationsTab />
           </Tabs.Panel>
-          <Tabs.Panel value="email-forwarding">
-            <PlaceholderTab name="Email Forwarding" />
-          </Tabs.Panel>
           <Tabs.Panel value="account">
             <PlaceholderTab name="Account" />
-          </Tabs.Panel>
-          <Tabs.Panel value="display">
-            <PlaceholderTab name="Display" />
-          </Tabs.Panel>
-          <Tabs.Panel value="apps">
-            <PlaceholderTab name="Apps" />
-          </Tabs.Panel>
-          <Tabs.Panel value="hacks">
-            <PlaceholderTab name="Hacks" />
           </Tabs.Panel>
         </div>
       </Tabs.Root>

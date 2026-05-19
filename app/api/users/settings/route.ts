@@ -78,8 +78,7 @@ const defaultNotifications = {
 };
 
 const updateSchema = z.object({
-  pronouns: z.string().optional(),
-  namePronunciation: z.string().optional(),
+  nickname: z.string().optional(),
   jobTitle: z.string().optional(),
   department: z.string().optional(),
   about: z.string().optional(),
@@ -142,8 +141,7 @@ export async function PATCH(req: NextRequest) {
     const parsed = updateSchema.parse(body);
 
     const updateData: Record<string, unknown> = {};
-    if (parsed.pronouns !== undefined) updateData.pronouns = parsed.pronouns;
-    if (parsed.namePronunciation !== undefined) updateData.namePronunciation = parsed.namePronunciation;
+    if (parsed.nickname !== undefined) updateData.nickname = parsed.nickname;
     if (parsed.jobTitle !== undefined) updateData.jobTitle = parsed.jobTitle;
     if (parsed.department !== undefined) updateData.department = parsed.department;
     if (parsed.about !== undefined) updateData.about = parsed.about;

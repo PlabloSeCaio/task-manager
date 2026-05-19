@@ -16,8 +16,7 @@ interface UserSettings {
   email: string
   avatarUrl?: string | null
   createdAt?: string | null
-  pronouns?: string | null
-  namePronunciation?: string | null
+  nickname?: string | null
   jobTitle?: string | null
   department?: string | null
   about?: string | null
@@ -38,12 +37,16 @@ export function ProfileTab() {
   const [saving, setSaving] = React.useState(false)
   const [uploading, setUploading] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const originalNameRef = React.useRef("")
 
   React.useEffect(() => {
     fetch("/api/users/settings")
       .then((r) => r.json())
       .then((res) => {
-        if (res.data) setSettings(res.data)
+        if (res.data) {
+          setSettings(res.data)
+          originalNameRef.current = res.data.name || ""
+        }
       })
       .catch(console.error)
   }, [])
@@ -141,7 +144,7 @@ export function ProfileTab() {
     setSaving(false)
   }, [saveAvatar])
 
-  const displayName = settings?.name || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "Unnamed"
+  const displayName = settings?.nickname || settings?.name || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "Unnamed"
   const displayEmail = settings?.email || user?.emailAddresses?.[0]?.emailAddress || ""
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
   const avatarUrl = resolveAvatarSrc(settings?.avatarUrl) || user?.imageUrl
@@ -198,38 +201,25 @@ export function ProfileTab() {
         <div className="grid grid-cols-[140px_1fr] gap-x-4 gap-y-5 items-start">
           <FieldLabel>Your full name *</FieldLabel>
           <Input
-            value={displayName}
+            value={settings?.name || ""}
             onChange={(e) => setSettings((prev) => prev ? { ...prev, name: e.target.value } : prev)}
             onBlur={(e) => {
-              if (e.target.value !== (settings?.name || user?.fullName)) {
-                updateName(e.target.value)
+              if (e.target.value !== originalNameRef.current) {
+                originalNameRef.current = e.target.value
+                updateName(e.target.value || "Unnamed")
               }
             }}
             className="h-7 text-sm"
           />
 
-          <FieldLabel>Pronouns</FieldLabel>
+          <FieldLabel>Nickname</FieldLabel>
           <Input
-            value={settings?.pronouns || ""}
-            onChange={(e) => setSettings((prev) => prev ? { ...prev, pronouns: e.target.value } : prev)}
-            onBlur={(e) => updateField("pronouns", e.target.value || null)}
-            placeholder="e.g. she/her, he/him, they/them"
+            value={settings?.nickname || ""}
+            onChange={(e) => setSettings((prev) => prev ? { ...prev, nickname: e.target.value } : prev)}
+            onBlur={(e) => updateField("nickname", e.target.value || null)}
+            placeholder="Display name (optional)"
             className="h-7 text-sm"
           />
-
-          <FieldLabel>Name pronunciation</FieldLabel>
-          <div className="flex items-center gap-2">
-            <Input
-              value={settings?.namePronunciation || ""}
-              onChange={(e) => setSettings((prev) => prev ? { ...prev, namePronunciation: e.target.value } : prev)}
-              onBlur={(e) => updateField("namePronunciation", e.target.value || null)}
-              placeholder="Phonetic spelling"
-              className="h-7 text-sm flex-1"
-            />
-            <Button variant="outline" size="sm" className="shrink-0 h-7 gap-1.5 text-xs">
-              Record audio clip
-            </Button>
-          </div>
 
           <FieldLabel>Job title</FieldLabel>
           <Input
