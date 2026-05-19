@@ -86,22 +86,20 @@ export async function POST(req: NextRequest) {
     }
 
     case "user.updated": {
-      const { id, first_name, last_name, image_url, email_addresses } = event.data;
-      const name = [first_name, last_name].filter(Boolean).join(" ") || "Unnamed";
+      const { id, email_addresses } = event.data;
       const email =
         (email_addresses as Array<{ email_address: string }>)?.[0]
           ?.email_address || undefined;
 
-      const updateData: Record<string, unknown> = {
-        name,
-        avatarUrl: (image_url as string) || null,
-      };
+      const updateData: Record<string, unknown> = {};
       if (email) updateData.email = email;
 
-      await db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.externalId, id as string));
+      if (Object.keys(updateData).length > 0) {
+        await db
+          .update(users)
+          .set(updateData)
+          .where(eq(users.externalId, id as string));
+      }
       break;
     }
 

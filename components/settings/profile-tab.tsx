@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { cn } from "@/lib/utils"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, Loader2Icon } from "lucide-react"
 
 interface UserSettings {
   name: string
@@ -27,11 +26,18 @@ interface UserSettings {
   outOfOffice?: Record<string, unknown>
 }
 
+function resolveAvatarSrc(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith("data:") || url.startsWith("http")) return url
+  return `/api/avatar?key=${encodeURIComponent(url)}`
+}
+
 export function ProfileTab() {
   const { user } = useUser()
   const [settings, setSettings] = React.useState<UserSettings | null>(null)
   const [saving, setSaving] = React.useState(false)
-  const [uploadToast, setUploadToast] = React.useState(false)
+  const [uploading, setUploading] = React.useState(false)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     fetch("/api/users/settings")
@@ -78,20 +84,67 @@ export function ProfileTab() {
     await updateField("personalization", updated)
   }, [settings, updateField])
 
-  const handlePhotoUpload = React.useCallback(() => {
-    setUploadToast(true)
-    setTimeout(() => setUploadToast(false), 3000)
+  const saveAvatar = React.useCallback(async (avatarUrl: string | null) => {
+    setSettings((prev) => (prev ? { ...prev, avatarUrl } : prev))
+    await fetch("/api/users/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl }),
+    })
   }, [])
 
-  const handlePhotoRemove = React.useCallback(() => {
-    setUploadToast(true)
-    setTimeout(() => setUploadToast(false), 3000)
+  const handlePhotoUpload = React.useCallback(() => {
+    fileInputRef.current?.click()
   }, [])
+
+  const handleFileChange = React.useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      // Try R2 presigned upload first
+      const presignRes = await fetch("/api/upload/presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      })
+      const presignData = await presignRes.json()
+
+      if (presignRes.ok) {
+        await fetch(presignData.data.uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        })
+        await saveAvatar(presignData.data.key)
+      } else {
+        // Fallback: base64 data URL
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        await saveAvatar(dataUrl)
+      }
+    } catch (err) {
+      console.error("Upload failed", err)
+    }
+    setUploading(false)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }, [saveAvatar])
+
+  const handlePhotoRemove = React.useCallback(async () => {
+    setSaving(true)
+    await saveAvatar(null)
+    setSaving(false)
+  }, [saveAvatar])
 
   const displayName = settings?.name || user?.fullName || user?.username || user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] || "Unnamed"
   const displayEmail = settings?.email || user?.emailAddresses?.[0]?.emailAddress || ""
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-  const avatarUrl = settings?.avatarUrl || user?.imageUrl
+  const avatarUrl = resolveAvatarSrc(settings?.avatarUrl) || user?.imageUrl
 
   return (
     <div className="space-y-8">
@@ -105,8 +158,27 @@ export function ProfileTab() {
           </Avatar>
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handlePhotoUpload}>
-                Upload new photo
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePhotoUpload}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2Icon className="size-3 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload new photo"
+                )}
               </Button>
               {avatarUrl && (
                 <Button variant="ghost" size="sm" onClick={handlePhotoRemove}>
@@ -117,11 +189,6 @@ export function ProfileTab() {
             <p className="text-xs text-muted-foreground">
               Photos help your teammates recognize you in Asana
             </p>
-            {uploadToast && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Photo upload is managed through your Clerk account
-              </p>
-            )}
           </div>
         </div>
       </Section>
