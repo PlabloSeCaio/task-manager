@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,13 @@ interface SubtaskListProps {
   onUpdate: () => void;
 }
 
-export function SubtaskList({
+export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(function SubtaskList({
   taskId,
   workspaceId,
   projectId,
   sectionId,
   onUpdate,
-}: SubtaskListProps) {
+}, ref) {
   const [subtasks, setSubtasks] = useState<Task[]>([]);
   const [newName, setNewName] = useState("");
 
@@ -132,6 +132,7 @@ export function SubtaskList({
       <div className="flex items-center gap-2">
         <Plus className="size-4 text-muted-foreground shrink-0" />
         <Input
+          ref={ref}
           placeholder="Add subtask..."
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -143,4 +144,4 @@ export function SubtaskList({
       </div>
     </div>
   );
-}
+});
