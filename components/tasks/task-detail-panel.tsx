@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarDays, User, CheckCircle2, Heart, Link2, Maximize2, Minimize2, MoreHorizontal, X, Plus, Paperclip, ChevronDown, Clock, Search, Trash2, Upload, File } from "lucide-react";
+import { CalendarDays, User, CheckCircle2, Heart, Link2, Maximize2, Minimize2, MoreHorizontal, X, Plus, Paperclip, ChevronDown, Search, Trash2, Upload, File, Smile, MessageCircle } from "lucide-react";
 import { FileUploader } from "@/components/shared/file-uploader";
 import { SubtaskList } from "@/components/tasks/subtask-list";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,6 @@ export function TaskDetailPanel({
   const [users, setUsers] = useState<UserType[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newComment, setNewComment] = useState("");
   const [notes, setNotes] = useState("");
   const [title, setTitle] = useState("");
   const [activityTab, setActivityTab] = useState<"comments" | "activity">("comments");
@@ -59,9 +58,16 @@ export function TaskDetailPanel({
   const [members, setMembers] = useState<UserType[]>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [dragOver, setDragOver] = useState(false);
+
+  const [composerText, setComposerText] = useState("");
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [sortNewest, setSortNewest] = useState(false);
+
   const titleRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchTask = useCallback(async () => {
     setLoading(true);
@@ -161,17 +167,37 @@ export function TaskDetailPanel({
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim()) return;
+    if (!composerText.trim() || submittingComment) return;
+    const tempId = `temp-${Date.now()}`;
+    const optimisticComment = {
+      id: tempId,
+      taskId,
+      authorId: "",
+      body: composerText.trim(),
+      htmlBody: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as unknown as Comment;
+    setComments(prev => [...prev, optimisticComment]);
+    const text = composerText.trim();
+    setComposerText("");
+    setSubmittingComment(true);
+
     try {
-      await fetch(`/api/tasks/${taskId}/comments`, {
+      const res = await fetch(`/api/tasks/${taskId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: newComment }),
+        body: JSON.stringify({ body: text }),
       });
-      setNewComment("");
-      await fetchTask();
-    } catch (err) {
-      console.error("Failed to add comment", err);
+      const json = await res.json();
+      if (json.data) {
+        setComments(prev => prev.map(c => c.id === tempId ? json.data : c));
+      }
+    } catch {
+      setComments(prev => prev.filter(c => c.id !== tempId));
+    } finally {
+      setSubmittingComment(false);
+      onUpdate();
     }
   };
 
@@ -330,8 +356,20 @@ export function TaskDetailPanel({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleComposerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAddComment();
+    }
+  };
+
   const assignedUser = users.find((u) => u.id === task?.assigneeId);
-  const projectColor = task && task.projectId ? getProjectColor(task.projectId) : "bg-blue-500";
+
+  const sortedComments = [...comments].sort((a, b) => {
+    const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return sortNewest ? db - da : da - db;
+  });
 
   function renderContent(t: Task) {
     return (
@@ -573,23 +611,17 @@ export function TaskDetailPanel({
                 />
               </PopoverContent>
             </Popover>
-
-            <DetailRow
-              icon={<Clock className="size-4" />}
-              label="Dependencies"
-              value={<span className="text-muted-foreground">Add dependencies</span>}
-            />
           </div>
 
           <div className="mt-4 border-t px-5 py-3">
             <Popover>
               <PopoverTrigger className="w-full">
                 <div className="flex items-center gap-2 text-sm hover:bg-muted/30 cursor-pointer rounded-sm px-1 -mx-1 py-1 transition-colors">
-                  <span className={cn("flex size-4 shrink-0 items-center justify-center rounded text-[8px] font-bold text-white", projectColor)}>
+                  <span className={cn("flex size-4 shrink-0 items-center justify-center rounded text-[8px] font-bold text-white", "bg-blue-500")}>
                     {t.name?.charAt(0)?.toUpperCase() || "T"}
                   </span>
                   <span className="text-muted-foreground">Projects</span>
-                  <span className="font-medium">{getProjectName(t)}</span>
+                  <span className="font-medium">Project</span>
                   {t.sectionId && (
                     <>
                       <ChevronDown className="size-3 text-muted-foreground" />
@@ -615,7 +647,7 @@ export function TaskDetailPanel({
                       t.sectionId === s.id && "bg-muted font-medium"
                     )}
                   >
-                    <span className={cn("size-2 rounded-full", getSectionColor(s.id))} />
+                    <span className={cn("size-2 rounded-full", "bg-blue-500")} />
                     {s.name}
                   </button>
                 ))}
@@ -724,114 +756,161 @@ export function TaskDetailPanel({
               </div>
             )}
           </div>
+
+          {/* ─── Comments section ─────────────────────────────── */}
+          <div className="border-t">
+            <div className="flex items-center gap-4 border-b px-5">
+              <button
+                onClick={() => setActivityTab("comments")}
+                className={cn(
+                  "py-2 text-xs font-medium border-b-2 transition-colors",
+                  activityTab === "comments"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Comments
+              </button>
+              <button
+                onClick={() => setActivityTab("activity")}
+                className={cn(
+                  "py-2 text-xs font-medium border-b-2 transition-colors",
+                  activityTab === "activity"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                All activity
+              </button>
+              <button
+                onClick={() => setSortNewest(!sortNewest)}
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {sortNewest ? "Newest" : "Oldest"}
+              </button>
+            </div>
+
+            <div className="px-5 py-3">
+              {activityTab === "activity" && (() => {
+                const creator = users.find((u) => u.id === t.createdById);
+                return (
+                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Avatar className="size-6">
+                      <AvatarFallback className="text-[9px]">
+                        {creator ? creator.name?.charAt(0)?.toUpperCase() || "?" : "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p>
+                      <span className="font-medium text-foreground">
+                        {creator?.name || creator?.email || "Unknown"}
+                      </span>{" "}
+                      created this task &middot;{" "}
+                      {t.createdAt
+                        ? formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })
+                        : "recently"}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {activityTab === "comments" && (
+                <div className="space-y-4">
+                  {sortedComments.length === 0 ? (
+                    <div className="py-6 text-center">
+                      <MessageCircle className="mx-auto size-6 text-muted-foreground/40 mb-1.5" />
+                      <p className="text-sm text-muted-foreground">No comments yet</p>
+                    </div>
+                  ) : (
+                    sortedComments.map((comment) => {
+                      const author = comment.authorId
+                        ? users.find((u) => u.id === comment.authorId)
+                        : (comment as any).author;
+                      const displayName = (author as any)?.name || author?.name || (comment as any).author?.name || "Unknown";
+                      const avatarUrl = (author as any)?.avatarUrl || author?.avatarUrl || (comment as any).author?.avatarUrl;
+                      return (
+                        <div key={comment.id} className="flex gap-3 group">
+                          <Avatar className="size-7 shrink-0 mt-0.5">
+                            <AvatarImage src={avatarUrl || undefined} />
+                            <AvatarFallback className="text-xs">{displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{displayName}</span>
+                              <span className="text-xs text-muted-foreground/60">
+                                {comment.createdAt
+                                  ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })
+                                  : ""}
+                              </span>
+                              <button className="ml-auto opacity-0 group-hover:opacity-100 size-6 flex items-center justify-center rounded hover:bg-muted transition-opacity">
+                                <Smile className="size-3.5 text-muted-foreground/60" />
+                              </button>
+                            </div>
+                            <p className="text-sm mt-0.5 whitespace-pre-wrap text-foreground/90">{comment.body}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="border-t bg-card">
-          <div className="flex items-center gap-4 border-b px-5">
-            <button
-              onClick={() => setActivityTab("comments")}
-              className={cn(
-                "py-2 text-xs font-medium border-b-2 transition-colors",
-                activityTab === "comments"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Comments
-            </button>
-            <button
-              onClick={() => setActivityTab("activity")}
-              className={cn(
-                "py-2 text-xs font-medium border-b-2 transition-colors",
-                activityTab === "activity"
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              All activity
-            </button>
-            <span className="ml-auto text-xs text-muted-foreground">Oldest</span>
-          </div>
-
-          <div className="max-h-48 overflow-y-auto px-5 py-3">
-            {activityTab === "activity" && (() => {
-              const creator = users.find((u) => u.id === t.createdById);
-              return (
-                <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Avatar className="size-6">
-                    <AvatarFallback className="text-[9px]">
-                      {creator ? creator.name?.charAt(0)?.toUpperCase() || "?" : "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <p>
-                    <span className="font-medium text-foreground">
-                      {creator?.name || creator?.email || "Unknown"}
-                    </span>{" "}
-                    created this task &middot;{" "}
-                    {t.createdAt
-                      ? formatDistanceToNow(new Date(t.createdAt), { addSuffix: true })
-                      : "recently"}
-                  </p>
-                </div>
-              );
-            })()}
-
-            {activityTab === "comments" && (
-              <div className="space-y-3">
-                {comments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No comments yet</p>
-                ) : (
-                  comments.map((comment) => {
-                    const author = users.find((u) => u.id === comment.authorId);
-                    return (
-                      <div key={comment.id} className="flex gap-2">
-                        <Avatar className="size-6 shrink-0">
-                          <AvatarFallback className="text-[9px]">
-                            {author ? author.name?.charAt(0)?.toUpperCase() || "?" : "?"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium">
-                              {author?.name || author?.email || "Unknown"}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {comment.createdAt ? format(new Date(comment.createdAt), "MMM d, yyyy") : ""}
-                            </span>
-                          </div>
-                          <p className="text-sm">{comment.body}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-start gap-2 border-t px-5 py-3">
-            <Avatar className="size-7 shrink-0">
+        {/* ─── Sticky Comment Composer ─────────────────────────── */}
+        <div className="sticky bottom-0 border-t bg-card px-5 py-3 z-10">
+          <div className="flex items-start gap-2.5">
+            <Avatar className="size-7 shrink-0 mt-0.5">
               <AvatarFallback className="text-xs">
                 {users[0] ? (users[0].name?.charAt(0)?.toUpperCase() || "?") : "?"}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 flex gap-2">
-              <input
-                type="text"
+            <div className="flex-1 min-w-0">
+              <textarea
+                ref={composerRef}
                 placeholder="Add a comment"
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleAddComment();
-                  }
-                }}
-                className="flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+                value={composerText}
+                onChange={(e) => setComposerText(e.target.value)}
+                onFocus={() => setComposerFocused(true)}
+                onKeyDown={handleComposerKeyDown}
+                rows={composerFocused ? 3 : 1}
+                className={cn(
+                  "w-full resize-none border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50 transition-all",
+                  composerFocused ? "min-h-[72px]" : "min-h-[20px]"
+                )}
               />
-              <Button size="xs" onClick={handleAddComment} disabled={!newComment.trim()}>
-                Send
-              </Button>
+              {composerFocused && (
+                <div className="flex items-center justify-between mt-1.5">
+                  <div className="flex items-center gap-1">
+                    <button className="size-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-muted-foreground/60 hover:text-muted-foreground">
+                      <Plus className="size-4" />
+                    </button>
+                    <button className="size-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-muted-foreground/60 hover:text-muted-foreground">
+                      <span className="text-sm font-semibold">Aa</span>
+                    </button>
+                    <button className="size-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-muted-foreground/60 hover:text-muted-foreground">
+                      <Smile className="size-4" />
+                    </button>
+                    <button className="size-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-muted-foreground/60 hover:text-muted-foreground">
+                      <span className="text-sm font-bold">@</span>
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="size-7 flex items-center justify-center rounded hover:bg-muted transition-colors text-muted-foreground/60 hover:text-muted-foreground"
+                    >
+                      <Paperclip className="size-4" />
+                    </button>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleAddComment}
+                    disabled={!composerText.trim() || submittingComment}
+                    className="h-7 text-xs px-3"
+                  >
+                    {submittingComment ? "Sending..." : "Comment"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -949,8 +1028,6 @@ function DueDatePopoverContent({
   value: string | null;
   onChange: (date: string | null) => void;
 }) {
-  const [open, setOpen] = useState(true);
-
   return (
     <>
       <div className="flex items-center justify-between border-b px-3 py-2">
@@ -982,55 +1059,3 @@ function DueDatePopoverContent({
     </>
   );
 }
-
-function DetailRow({
-  icon,
-  label,
-  value,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-3 py-2 border-b border-border/50 last:border-0",
-        onClick && "cursor-pointer hover:bg-muted/30 rounded-sm px-1 -mx-1 transition-colors"
-      )}
-    >
-      <div className="flex w-5 shrink-0 items-center justify-center text-muted-foreground">
-        {icon}
-      </div>
-      <span className="w-24 text-xs text-muted-foreground">{label}</span>
-      <div className="flex-1 text-sm">{value}</div>
-    </div>
-  );
-}
-
-function getProjectColor(projectId: string): string {
-  const colors = [
-    "bg-blue-500", "bg-green-500", "bg-red-500", "bg-yellow-500",
-    "bg-purple-500", "bg-pink-500", "bg-orange-500", "bg-teal-500",
-  ];
-  const index = projectId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return colors[index % colors.length];
-}
-
-function getSectionColor(sectionId: string): string {
-  const colors = [
-    "bg-blue-500", "bg-green-500", "bg-red-500", "bg-yellow-500",
-    "bg-purple-500", "bg-pink-500", "bg-orange-500", "bg-teal-500",
-  ];
-  const index = sectionId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return colors[index % colors.length];
-}
-
-function getProjectName(task: Task | null): string {
-  return "Project";
-}
-
-

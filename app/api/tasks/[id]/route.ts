@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { tasks } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { tasks, comments, attachments } from "@/lib/db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
 import { getCurrentUserId, getCurrentOrgId, apiError, apiSuccess } from "@/lib/api-helpers";
@@ -41,7 +41,16 @@ export async function GET(
       return apiError("Task not found", 404);
     }
 
-    return apiSuccess(task);
+    const [commentCountResult] = await db.select({ count: sql<number>`count(*)` }).from(comments).where(eq(comments.taskId, id));
+    const [attachmentCountResult] = await db.select({ count: sql<number>`count(*)` }).from(attachments).where(eq(attachments.taskId, id));
+    const [latestImage] = await db.select({ url: attachments.url }).from(attachments).where(and(eq(attachments.taskId, id), sql`${attachments.contentType} LIKE 'image/%'`)).orderBy(desc(attachments.createdAt)).limit(1);
+
+    return apiSuccess({
+      ...task,
+      commentCount: commentCountResult?.count ?? 0,
+      attachmentCount: attachmentCountResult?.count ?? 0,
+      latestImageUrl: latestImage?.url ?? null,
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError("Unauthorized", 401);

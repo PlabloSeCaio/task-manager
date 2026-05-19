@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { tasks } from "@/lib/db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { tasks, comments, attachments } from "@/lib/db/schema";
+import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
 import { getCurrentUserId, getDbUserId, getCurrentOrgId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
@@ -48,7 +48,33 @@ export async function GET(req: NextRequest) {
       .where(and(...conditions))
       .orderBy(asc(tasks.position), asc(tasks.createdAt));
 
-    return apiSuccess(allTasks);
+    const taskIds = allTasks.map(t => t.id);
+
+    const [commentCounts, attachmentCounts, latestImages] = await Promise.all([
+      taskIds.length > 0
+        ? db.select({ taskId: comments.taskId, count: sql<number>`count(*)` }).from(comments).where(inArray(comments.taskId, taskIds)).groupBy(comments.taskId)
+        : Promise.resolve([]),
+      taskIds.length > 0
+        ? db.select({ taskId: attachments.taskId, count: sql<number>`count(*)` }).from(attachments).where(inArray(attachments.taskId, taskIds)).groupBy(attachments.taskId)
+        : Promise.resolve([]),
+      taskIds.length > 0
+        ? db.select({ taskId: attachments.taskId, url: attachments.url, createdAt: attachments.createdAt }).from(attachments).where(and(inArray(attachments.taskId, taskIds), sql`${attachments.contentType} LIKE 'image/%'`)).orderBy(desc(attachments.createdAt)).then(rows => rows.filter(r => r.taskId && r.url))
+        : Promise.resolve([]),
+    ]);
+
+    const commentCountMap = new Map(commentCounts.map(r => [r.taskId, r.count]));
+    const attachmentCountMap = new Map(attachmentCounts.map(r => [r.taskId, r.count]));
+    const latestImageMap = new Map<string, string>();
+    for (const att of latestImages) {
+      if (att.url && att.taskId && !latestImageMap.has(att.taskId)) latestImageMap.set(att.taskId, att.url);
+    }
+
+    return apiSuccess(allTasks.map(t => ({
+      ...t,
+      commentCount: commentCountMap.get(t.id) ?? 0,
+      attachmentCount: attachmentCountMap.get(t.id) ?? 0,
+      latestImageUrl: latestImageMap.get(t.id) ?? null,
+    })));
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return apiError("Unauthorized", 401);

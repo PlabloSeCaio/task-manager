@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { comments } from "@/lib/db/schema";
+import { comments, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
@@ -53,7 +53,12 @@ export async function POST(
       })
       .returning();
 
-    return apiSuccess(comment, 201);
+    const [author] = await db.select({ name: users.name, avatarUrl: users.avatarUrl, email: users.email }).from(users).where(eq(users.id, dbUserId)).limit(1);
+
+    return apiSuccess({
+      ...comment,
+      author: author ?? null,
+    }, 201);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return apiError(error.issues[0].message, 400);

@@ -2,14 +2,14 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, MessageSquare, Heart, Check } from "lucide-react";
+import { CalendarDays, MessageSquare, Heart, Check, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format, isPast, parseISO } from "date-fns";
 import type { Task, User } from "@/types";
 
 interface TaskCardProps {
-  task: Task;
+  task: Task & { commentCount?: number; attachmentCount?: number; latestImageUrl?: string | null };
   users: User[];
   onClick: () => void;
   onToggleComplete: (task: Task) => void;
@@ -49,12 +49,22 @@ export function TaskCard({ task, users, onClick, onToggleComplete }: TaskCardPro
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group rounded-lg border bg-card px-3 py-2.5 shadow-sm transition-all hover:shadow-md hover:border-border/80 cursor-pointer",
+        "group rounded-lg border bg-card shadow-sm transition-all hover:shadow-md hover:border-border/80 cursor-pointer overflow-hidden",
         isDragging && "z-50 opacity-50 shadow-lg ring-2 ring-primary/20",
         task.completed && "opacity-60"
       )}
     >
-      <div className="flex items-start gap-2.5">
+      {task.latestImageUrl && (
+        <div className="w-full h-28 overflow-hidden -mb-1">
+          <img
+            src={task.latestImageUrl}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+
+      <div className="flex items-start gap-2.5 px-3 py-2.5">
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleComplete(task); }}
@@ -103,12 +113,26 @@ export function TaskCard({ task, users, onClick, onToggleComplete }: TaskCardPro
               </div>
             )}
 
-            {task.likeCount != null && task.likeCount > 0 && (
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Heart className={cn("size-3", task.liked && "fill-red-500 text-red-500")} />
-                <span>{task.likeCount}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {(task.commentCount ?? 0) > 0 && (
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <MessageSquare className="size-3" />
+                  <span>{task.commentCount}</span>
+                </div>
+              )}
+              {(task.attachmentCount ?? 0) > 0 && (
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Paperclip className="size-3" />
+                  <span>{task.attachmentCount}</span>
+                </div>
+              )}
+              {task.likeCount != null && task.likeCount > 0 && (
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Heart className={cn("size-3", task.liked && "fill-red-500 text-red-500")} />
+                  <span>{task.likeCount}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
