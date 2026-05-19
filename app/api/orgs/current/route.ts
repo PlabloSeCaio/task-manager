@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { workspaces } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,7 +13,6 @@ export async function GET() {
 
     const orgId = session.orgId;
 
-    // If user has an active Clerk org, try to find a mapped workspace
     if (orgId) {
       const [ws] = await db
         .select({
@@ -34,13 +33,18 @@ export async function GET() {
         });
       }
 
-      // Auto-link: if org exists but no mapping yet, link the default workspace
+      // No mapping found for this org
       const [defaultWs] = await db
-        .select({ id: workspaces.id, name: workspaces.name })
+        .select({
+          id: workspaces.id,
+          name: workspaces.name,
+          clerkOrganizationId: workspaces.clerkOrganizationId,
+        })
         .from(workspaces)
         .where(eq(workspaces.id, DEFAULT_WORKSPACE_ID));
 
-      if (defaultWs) {
+      if (defaultWs && !defaultWs.clerkOrganizationId) {
+        // Default workspace is unclaimed — link it to this org
         await db
           .update(workspaces)
           .set({ clerkOrganizationId: orgId })
@@ -52,9 +56,36 @@ export async function GET() {
           orgId,
         });
       }
+
+      // Default already claimed by another org — create a dedicated workspace
+      let orgName = "My Workspace";
+      let orgSlug = orgId;
+      try {
+        const client = await clerkClient();
+        const org = await client.organizations.getOrganization({ organizationId: orgId });
+        orgName = org.name;
+        orgSlug = org.slug || orgId;
+      } catch {
+        // fallback to generic values if Clerk API unavailable
+      }
+
+      const [newWs] = await db
+        .insert(workspaces)
+        .values({
+          name: orgName,
+          slug: orgSlug,
+          clerkOrganizationId: orgId,
+        })
+        .returning({ id: workspaces.id, name: workspaces.name });
+
+      return apiSuccess({
+        workspaceId: newWs.id,
+        workspaceName: newWs.name,
+        orgId,
+      });
     }
 
-    // Fallback: no org selected — use default
+    // No org selected — fallback to default workspace
     const [defaultWs] = await db
       .select({
         id: workspaces.id,
