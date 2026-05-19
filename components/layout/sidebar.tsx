@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -12,12 +12,28 @@ import {
   X,
   ChevronRight,
   FolderKanban,
+  Share2,
+  ExternalLink,
+  Link as LinkIcon,
+  Palette,
+  Star,
+  Archive,
+  Trash2,
+  Copy,
+  SortAsc,
+  ArrowUpAZ,
+  Clock,
+  TrendingUp,
+  Check,
 } from "lucide-react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { useActiveOrg } from "@/components/layout/org-context";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
+import { ProjectThumbnail, projectColorPalette, getColorClass } from "@/components/projects/project-thumbnail";
+import { projectIcons, getIconById } from "@/lib/project-icons";
+import { useToast } from "@/lib/toast-context";
 import type { Project } from "@/types";
 
 const navTop = [
@@ -26,36 +42,37 @@ const navTop = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
 ];
 
-const projectColors: Record<string, string> = {
-  blue: "bg-blue-500",
-  green: "bg-green-500",
-  red: "bg-red-500",
-  yellow: "bg-yellow-500",
-  purple: "bg-purple-500",
-  pink: "bg-pink-500",
-  orange: "bg-orange-500",
-  teal: "bg-teal-500",
-};
+type SortMode = "alphabetical" | "recent" | "top";
 
-const colorOptions = ["blue", "teal", "purple", "yellow", "orange", "pink", "green"];
-
-function getProjectColor(color?: string | null, index = 0): string {
-  if (color && projectColors[color]) return projectColors[color];
-  return projectColors[colorOptions[index % colorOptions.length]];
-}
-
-function getProjectInitial(name: string): string {
-  return name.charAt(0).toUpperCase();
-}
+const sortOptions: { id: SortMode; label: string; icon: typeof ArrowUpAZ }[] = [
+  { id: "alphabetical", label: "Alphabetical", icon: ArrowUpAZ },
+  { id: "recent", label: "Recent", icon: Clock },
+  { id: "top", label: "Top", icon: TrendingUp },
+];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { mobileOpen, setMobileOpen } = useSidebar();
   const { workspaceId } = useActiveOrg();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const [projectsDropdownOpen, setProjectsDropdownOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("alphabetical");
+  const [contextMenu, setContextMenu] = useState<{
+    project: Project;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [colorIconSubmenu, setColorIconSubmenu] = useState(false);
+  const [renameProject, setRenameProject] = useState<Project | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const addRef = useRef<HTMLDivElement>(null);
+  const projectsTitleRef = useRef<HTMLButtonElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -72,10 +89,168 @@ export function Sidebar() {
       if (addRef.current && !addRef.current.contains(e.target as Node)) {
         setAddDropdownOpen(false);
       }
+      if (
+        projectsTitleRef.current &&
+        !projectsTitleRef.current.contains(e.target as Node)
+      ) {
+        setProjectsDropdownOpen(false);
+      }
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(e.target as Node)
+      ) {
+        setContextMenu(null);
+        setColorIconSubmenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setContextMenu(null);
+        setColorIconSubmenu(false);
+        setAddDropdownOpen(false);
+        setProjectsDropdownOpen(false);
+        setRenameProject(null);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (renameProject && renameInputRef.current) {
+      renameInputRef.current.select();
+    }
+  }, [renameProject]);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, project: Project) => {
+      e.preventDefault();
+      setContextMenu({ project, x: e.clientX, y: e.clientY });
+    },
+    []
+  );
+
+  const sortedProjects = [...projects].sort((a, b) => {
+    if (sortMode === "alphabetical") return a.name.localeCompare(b.name);
+    if (sortMode === "recent") {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    }
+    if (sortMode === "top") {
+      const aStarred = a.isStarred ? 1 : 0;
+      const bStarred = b.isStarred ? 1 : 0;
+      if (bStarred !== aStarred) return bStarred - aStarred;
+      return a.name.localeCompare(b.name);
+    }
+    return 0;
+  });
+
+  const updateProjectInList = useCallback(
+    (updated: Project) => {
+      setProjects((prev) =>
+        prev.map((p) => (p.id === updated.id ? updated : p))
+      );
+    },
+    []
+  );
+
+  const handleRenameSave = useCallback(async () => {
+    if (!renameProject || !renameDraft.trim()) return;
+    try {
+      const res = await fetch(`/api/projects/${renameProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: renameDraft.trim() }),
+      });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        updateProjectInList(json.data);
+        toast("Project renamed", "success");
+      }
+    } catch {
+      toast("Failed to rename", "error");
+    }
+    setRenameProject(null);
+  }, [renameProject, renameDraft, updateProjectInList, toast]);
+
+  const handleArchiveFromMenu = useCallback(async (project: Project) => {
+    setContextMenu(null);
+    if (!confirm("Archive this project?")) return;
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (res.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== project.id));
+        toast("Project archived", "success");
+      }
+    } catch {
+      toast("Failed to archive", "error");
+    }
+  }, [toast]);
+
+  const handleStarFromMenu = useCallback(
+    async (project: Project) => {
+      setContextMenu(null);
+      try {
+        const res = await fetch(`/api/projects/${project.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isStarred: !project.isStarred }),
+        });
+        const json = await res.json();
+        if (res.ok && json.data) updateProjectInList(json.data);
+      } catch {
+        toast("Failed to update", "error");
+      }
+    },
+    [updateProjectInList, toast]
+  );
+
+  const handleSetColorIcon = useCallback(
+    async (project: Project, field: "color" | "icon", value: string | null) => {
+      try {
+        const body: Record<string, unknown> = {};
+        if (field === "color") body.color = value;
+        if (field === "icon") body.icon = value;
+        const res = await fetch(`/api/projects/${project.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (res.ok && json.data) {
+          updateProjectInList(json.data);
+          toast(
+            field === "color" ? "Color updated" : "Icon updated",
+            "success"
+          );
+        }
+      } catch {
+        toast("Failed to update", "error");
+      }
+    },
+    [updateProjectInList, toast]
+  );
+
+  const handleCopyLink = useCallback(
+    (projectId: string) => {
+      navigator.clipboard.writeText(
+        `${window.location.origin}/projects/${projectId}/list`
+      );
+      toast("Link copied", "success");
+      setContextMenu(null);
+    },
+    [toast]
+  );
 
   const sidebarContent = (
     <>
@@ -127,9 +302,61 @@ export function Sidebar() {
         </div>
 
         <div className="mt-5 mb-1 flex items-center justify-between px-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-            Projects
-          </span>
+          <div className="relative">
+            <button
+              ref={projectsTitleRef}
+              onClick={() => setProjectsDropdownOpen(!projectsDropdownOpen)}
+              className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 hover:text-sidebar-foreground/60 transition-colors cursor-pointer"
+            >
+              Projects
+            </button>
+            {projectsDropdownOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-lg border bg-popover shadow-sm">
+                <button
+                  onClick={() => {
+                    setProjectsDropdownOpen(false);
+                    setNewProjectOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Plus className="size-4 text-muted-foreground" />
+                  <span>New project</span>
+                </button>
+                <Link
+                  href="/projects/browse"
+                  onClick={() => {
+                    setProjectsDropdownOpen(false);
+                    setMobileOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                >
+                  <FolderKanban className="size-4 text-muted-foreground" />
+                  <span>Browse projects</span>
+                </Link>
+                <div className="border-t" />
+                {sortOptions.map((opt) => {
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        setSortMode(opt.id);
+                        setProjectsDropdownOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      <Icon className="size-4 text-muted-foreground" />
+                      <span className="flex-1 text-left">{opt.label}</span>
+                      {sortMode === opt.id && (
+                        <Check className="size-3.5 text-primary" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="relative" ref={addRef}>
             <button
               onClick={() => setAddDropdownOpen(!addDropdownOpen)}
@@ -156,33 +383,61 @@ export function Sidebar() {
         </div>
 
         <div className="space-y-0.5">
-          {projects.map((project, i) => {
+          {sortedProjects.map((project) => {
             const active = pathname.startsWith(`/projects/${project.id}`);
             return (
-              <Link
-                key={project.id}
-                href={`/projects/${project.id}/list`}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
-                  active
-                    ? "bg-sidebar-accent text-sidebar-foreground"
-                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              <div key={project.id}>
+                {renameProject?.id === project.id ? (
+                  <div className="flex items-center gap-3 rounded-md px-3 py-1.5">
+                    <ProjectThumbnail
+                      name={project.name}
+                      color={project.color}
+                      icon={project.icon}
+                      defaultView={project.defaultView}
+                      size="sm"
+                    />
+                    <input
+                      ref={renameInputRef}
+                      value={renameDraft}
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onBlur={handleRenameSave}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameSave();
+                        if (e.key === "Escape") setRenameProject(null);
+                      }}
+                      className="h-6 flex-1 rounded border border-input bg-background px-1.5 text-sm outline-none ring-1 ring-ring"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <Link
+                    href={`/projects/${project.id}/list`}
+                    onClick={() => setMobileOpen(false)}
+                    onContextMenu={(e) => handleContextMenu(e, project)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors",
+                      active
+                        ? "bg-sidebar-accent text-sidebar-foreground"
+                        : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <ProjectThumbnail
+                      name={project.name}
+                      color={project.color}
+                      icon={project.icon}
+                      defaultView={project.defaultView}
+                      size="sm"
+                    />
+                    <span className="truncate flex-1">{project.name}</span>
+                    {project.isStarred && (
+                      <Star className="size-3 fill-yellow-400 text-yellow-400 shrink-0" />
+                    )}
+                  </Link>
                 )}
-              >
-                <span
-                  className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-bold text-white",
-                    getProjectColor(project.color, i)
-                  )}
-                >
-                  {getProjectInitial(project.name)}
-                </span>
-                <span className="truncate">{project.name}</span>
-              </Link>
+              </div>
             );
           })}
-          {projects.length === 0 && (
+          {sortedProjects.length === 0 && (
             <button
               onClick={() => setNewProjectOpen(true)}
               className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer"
@@ -222,6 +477,109 @@ export function Sidebar() {
   return (
     <>
       <NewProjectFlow open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
+
+      {/* Context menu */}
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-[60]"
+            onClick={() => {
+              setContextMenu(null);
+              setColorIconSubmenu(false);
+            }}
+          />
+          <div
+            ref={contextMenuRef}
+            className="fixed z-[70] w-56 overflow-hidden rounded-lg border bg-popover py-1 shadow-lg ring-1 ring-foreground/10"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {!colorIconSubmenu ? (
+              <>
+                <button
+                  onClick={() => toast("Share dialog would open here", "info")}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Share2 className="size-4 text-muted-foreground" />
+                  Share project
+                </button>
+                <button
+                  onClick={() => {
+                    window.open(
+                      `/projects/${contextMenu.project.id}/list`,
+                      "_blank"
+                    );
+                    setContextMenu(null);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="size-4 text-muted-foreground" />
+                  Open in new tab
+                </button>
+                <button
+                  onClick={() => handleCopyLink(contextMenu.project.id)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <LinkIcon className="size-4 text-muted-foreground" />
+                  Copy link
+                </button>
+                <div className="my-1 border-t" />
+                <button
+                  onClick={() => setColorIconSubmenu(true)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Palette className="size-4 text-muted-foreground" />
+                  Set color & icon
+                  <ChevronRight className="ml-auto size-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => {
+                    setRenameProject(contextMenu.project);
+                    setRenameDraft(contextMenu.project.name);
+                    setContextMenu(null);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Copy className="size-4 text-muted-foreground" />
+                  Rename
+                </button>
+                <button
+                  onClick={() => handleStarFromMenu(contextMenu.project)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Star className="size-4 text-muted-foreground" />
+                  {contextMenu.project.isStarred
+                    ? "Remove from starred"
+                    : "Add to starred"}
+                </button>
+                <button
+                  onClick={() => toast("Portfolio selector would open here", "info")}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <FolderKanban className="size-4 text-muted-foreground" />
+                  Add to portfolio
+                </button>
+                <div className="my-1 border-t" />
+                <button
+                  onClick={() => handleArchiveFromMenu(contextMenu.project)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <Archive className="size-4 text-muted-foreground" />
+                  Archive project
+                </button>
+              </>
+            ) : (
+              <ColorIconSubmenu
+                project={contextMenu.project}
+                onSetColor={(color) => handleSetColorIcon(contextMenu.project, "color", color)}
+                onSetIcon={(icon) => handleSetColorIcon(contextMenu.project, "icon", icon)}
+                onBack={() => setColorIconSubmenu(false)}
+              />
+            )}
+          </div>
+        </>
+      )}
+
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -243,5 +601,96 @@ export function Sidebar() {
         {sidebarContent}
       </aside>
     </>
+  );
+}
+
+function ColorIconSubmenu({
+  project,
+  onSetColor,
+  onSetIcon,
+  onBack,
+}: {
+  project: Project;
+  onSetColor: (color: string | null) => void;
+  onSetIcon: (icon: string | null) => void;
+  onBack: () => void;
+}) {
+  const [tab, setTab] = useState<"color" | "icon">("color");
+
+  return (
+    <div className="p-2">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors cursor-pointer"
+      >
+        <ChevronRight className="size-3 rotate-180" />
+        Back
+      </button>
+
+      <div className="flex gap-0 mb-3 border-b">
+        <button
+          onClick={() => setTab("color")}
+          className={`pb-1.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+            tab === "color"
+              ? "border-foreground text-foreground"
+              : "border-transparent text-muted-foreground"
+          }`}
+        >
+          Color
+        </button>
+        <button
+          onClick={() => setTab("icon")}
+          className={`pb-1.5 text-xs font-medium border-b-2 ml-3 transition-colors cursor-pointer ${
+            tab === "icon"
+              ? "border-foreground text-foreground"
+              : "border-transparent text-muted-foreground"
+          }`}
+        >
+          Icon
+        </button>
+      </div>
+
+      {tab === "color" && (
+        <div className="grid grid-cols-5 gap-1.5">
+          {projectColorPalette.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => onSetColor(c.id)}
+              className={`size-7 rounded-full transition-all cursor-pointer ${c.class} ${
+                project.color === c.id
+                  ? "ring-2 ring-offset-1 ring-offset-popover ring-foreground/40"
+                  : ""
+              }`}
+            >
+              {project.color === c.id && (
+                <Check className="size-3.5 text-white mx-auto" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "icon" && (
+        <div className="grid grid-cols-5 gap-1">
+          {projectIcons.map((ic) => {
+            const IconComp = ic.icon;
+            return (
+              <button
+                key={ic.id}
+                onClick={() => onSetIcon(ic.id)}
+                className={`flex size-8 items-center justify-center rounded-md transition-colors cursor-pointer ${
+                  project.icon === ic.id
+                    ? "bg-primary/10 text-primary ring-1 ring-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+                title={ic.label}
+              >
+                <IconComp className="size-4" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

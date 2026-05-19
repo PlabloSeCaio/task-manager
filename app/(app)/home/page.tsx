@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { ProjectThumbnail } from "@/components/projects/project-thumbnail";
+import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { useActiveOrg } from "@/components/layout/org-context";
 import { cn } from "@/lib/utils";
 import { format, isPast, isThisWeek, startOfWeek, endOfWeek, parseISO } from "date-fns";
@@ -76,6 +78,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskTab, setTaskTab] = useState<"upcoming" | "overdue" | "completed">("upcoming");
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -363,7 +366,14 @@ export default function HomePage() {
 
                           {project && (
                             <span className="hidden sm:inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 border">
-                              <span className={cn("size-1.5 rounded-full", getProjectColor(project.color))} />
+                              <ProjectThumbnail
+                                name={project.name}
+                                color={project.color}
+                                icon={project.icon}
+                                defaultView={project.defaultView}
+                                size="sm"
+                                className="!size-3.5 !rounded-[3px]"
+                              />
                               {project.name}
                             </span>
                           )}
@@ -427,34 +437,33 @@ export default function HomePage() {
                         "flex items-center gap-2.5 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/50",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "flex size-7 shrink-0 items-center justify-center rounded text-[11px] font-bold text-white",
-                          getProjectColor(project.color, i)
-                        )}
-                      >
-                        {(project.name || "P").charAt(0).toUpperCase()}
-                      </span>
+                      <ProjectThumbnail
+                        name={project.name}
+                        color={project.color}
+                        icon={project.icon}
+                        defaultView={project.defaultView}
+                        size="md"
+                      />
                       <span className="truncate text-sm">{project.name}</span>
                     </Link>
                   ))}
 
-                  <Link
-                    href="/projects"
-                    className="flex items-center gap-2.5 rounded-md border border-dashed px-3 py-2.5 transition-colors hover:bg-muted/50 text-muted-foreground/60 hover:text-muted-foreground"
+                  <button
+                    onClick={() => setNewProjectOpen(true)}
+                    className="flex items-center gap-2.5 rounded-md border border-dashed px-3 py-2.5 transition-colors hover:bg-muted/50 text-muted-foreground/60 hover:text-muted-foreground cursor-pointer"
                   >
                     <span className="flex size-7 shrink-0 items-center justify-center rounded border border-dashed">
                       <Plus className="size-3.5" />
                     </span>
                     <span className="text-sm">Create project</span>
-                  </Link>
+                  </button>
                 </div>
               </div>
 
               {projects.length > 6 && (
                 <div className="border-t px-4 py-2">
                   <Link
-                    href="/projects"
+                    href="/projects/browse"
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                   >
                     Show more
@@ -519,6 +528,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      <NewProjectFlow open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
       {selectedTaskId && (
         <TaskDetailPanel
           taskId={selectedTaskId}

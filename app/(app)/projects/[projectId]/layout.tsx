@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,10 @@ export default function ProjectLayout({
       .catch(console.error);
   }, [projectId]);
 
+  const handleProjectUpdate = useCallback((updated: Project) => {
+    setProject(updated);
+  }, []);
+
   const handleAddTask = async () => {
     try {
       const sectionsRes = await fetch(`/api/projects/${projectId}/sections`);
@@ -74,6 +78,7 @@ export default function ProjectLayout({
       {project && (
         <ProjectHeader
           project={project}
+          onUpdate={handleProjectUpdate}
           onOpenRules={() => setRulesOpen(true)}
           onOpenStatusUpdate={() => setStatusOpen(true)}
         />

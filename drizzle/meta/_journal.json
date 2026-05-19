@@ -8,6 +8,20 @@
       "when": 1779129080370,
       "tag": "0000_lively_dorian_gray",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0004_add_icon_is_starred",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779212946747,
+      "tag": "0002_wild_tarot",
+      "breakpoints": true
     }
   ]
 }
