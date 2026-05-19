@@ -35,6 +35,7 @@ import { ProjectThumbnail, projectColorPalette, getColorClass } from "@/componen
 import { projectIcons, getIconById } from "@/lib/project-icons";
 import { useToast } from "@/lib/toast-context";
 import { getProjectUrl, getProjectViewSlug } from "@/lib/utils";
+import { eventBus } from "@/lib/event-bus";
 import type { Project } from "@/types";
 
 const navTop = [
@@ -77,7 +78,7 @@ export function Sidebar() {
   const projectsTitleRef = useRef<HTMLButtonElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const fetchProjects = useCallback(() => {
     if (!workspaceId) return;
     fetch(`/api/projects?workspaceId=${workspaceId}`)
       .then((res) => res.json())
@@ -86,6 +87,21 @@ export function Sidebar() {
       })
       .catch(() => {});
   }, [workspaceId]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  useEffect(() => {
+    eventBus.on("project:created", fetchProjects);
+    eventBus.on("project:updated", fetchProjects);
+    eventBus.on("project:deleted", fetchProjects);
+    return () => {
+      eventBus.off("project:created", fetchProjects);
+      eventBus.off("project:updated", fetchProjects);
+      eventBus.off("project:deleted", fetchProjects);
+    };
+  }, [fetchProjects]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -174,6 +190,7 @@ export function Sidebar() {
       const json = await res.json();
       if (res.ok && json.data) {
         updateProjectInList(json.data);
+        eventBus.emit("project:updated");
         toast("Project renamed", "success");
       }
     } catch {
@@ -193,6 +210,7 @@ export function Sidebar() {
       });
       if (res.ok) {
         setProjects((prev) => prev.filter((p) => p.id !== project.id));
+        eventBus.emit("project:deleted");
         toast("Project archived", "success");
       }
     } catch {
@@ -210,7 +228,10 @@ export function Sidebar() {
           body: JSON.stringify({ isStarred: !project.isStarred }),
         });
         const json = await res.json();
-        if (res.ok && json.data) updateProjectInList(json.data);
+        if (res.ok && json.data) {
+          updateProjectInList(json.data);
+          eventBus.emit("project:updated");
+        }
       } catch {
         toast("Failed to update", "error");
       }
@@ -232,6 +253,7 @@ export function Sidebar() {
         const json = await res.json();
         if (res.ok && json.data) {
           updateProjectInList(json.data);
+          eventBus.emit("project:updated");
           toast(
             field === "color" ? "Color updated" : "Icon updated",
             "success"

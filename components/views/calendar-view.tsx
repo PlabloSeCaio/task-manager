@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 import { format, isSameDay, parseISO } from "date-fns";
+import { eventBus } from "@/lib/event-bus";
 import type { Task } from "@/types";
 
 export function CalendarView() {
@@ -29,6 +30,21 @@ export function CalendarView() {
 
   useEffect(() => {
     fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    eventBus.on("task:created", fetchData);
+    eventBus.on("task:updated", fetchData);
+    eventBus.on("task:deleted", fetchData);
+    eventBus.on("comment:created", fetchData);
+    eventBus.on("attachment:created", fetchData);
+    return () => {
+      eventBus.off("task:created", fetchData);
+      eventBus.off("task:updated", fetchData);
+      eventBus.off("task:deleted", fetchData);
+      eventBus.off("comment:created", fetchData);
+      eventBus.off("attachment:created", fetchData);
+    };
   }, [fetchData]);
 
   const tasksByDate = useMemo(() => {

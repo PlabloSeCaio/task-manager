@@ -21,6 +21,7 @@ import { useActiveOrg } from "@/components/layout/org-context";
 import { cn } from "@/lib/utils";
 import { format, isPast, isThisWeek, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { getProjectUrl } from "@/lib/utils";
+import { eventBus } from "@/lib/event-bus";
 import type { Task, Project, User } from "@/types";
 
 const projectColorMap: Record<string, string> = {
@@ -121,6 +122,30 @@ export default function HomePage() {
     init();
     return () => { cancelled = true; };
   }, [workspaceId]);
+
+  const loadTasks = useCallback(() => {
+    fetch("/api/tasks")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.data) setAllTasks(json.data);
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    eventBus.on("task:created", loadTasks);
+    eventBus.on("task:updated", loadTasks);
+    eventBus.on("task:deleted", loadTasks);
+    eventBus.on("comment:created", loadTasks);
+    eventBus.on("attachment:created", loadTasks);
+    return () => {
+      eventBus.off("task:created", loadTasks);
+      eventBus.off("task:updated", loadTasks);
+      eventBus.off("task:deleted", loadTasks);
+      eventBus.off("comment:created", loadTasks);
+      eventBus.off("attachment:created", loadTasks);
+    };
+  }, [loadTasks]);
 
   const myTasks = useMemo(
     () => allTasks.filter((t) => t.assigneeId === currentUser?.id),

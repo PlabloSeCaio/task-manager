@@ -13,6 +13,7 @@ import {
   startOfMonth,
   endOfMonth,
 } from "date-fns";
+import { eventBus } from "@/lib/event-bus";
 import type { Task, Section } from "@/types";
 
 const BAR_HEIGHT = 28;
@@ -48,6 +49,21 @@ export function TimelineView() {
 
   useEffect(() => {
     fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    eventBus.on("task:created", fetchData);
+    eventBus.on("task:updated", fetchData);
+    eventBus.on("task:deleted", fetchData);
+    eventBus.on("comment:created", fetchData);
+    eventBus.on("attachment:created", fetchData);
+    return () => {
+      eventBus.off("task:created", fetchData);
+      eventBus.off("task:updated", fetchData);
+      eventBus.off("task:deleted", fetchData);
+      eventBus.off("comment:created", fetchData);
+      eventBus.off("attachment:created", fetchData);
+    };
   }, [fetchData]);
 
   const { dateRange, days } = useMemo(() => {

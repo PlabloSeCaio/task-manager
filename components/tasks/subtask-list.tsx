@@ -5,6 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Trash2, Plus, CalendarDays, User, ChevronRight, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "@/types";
 
 interface SubtaskListProps {
@@ -266,6 +269,34 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
 
   const hasNewRow = subtasks.some(s => s.id.startsWith("new-"));
 
+  const [activeSubtask, setActiveSubtask] = useState<Task | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = subtasks.findIndex(s => s.id === active.id);
+    const newIndex = subtasks.findIndex(s => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(subtasks, oldIndex, newIndex);
+    setSubtasks(reordered);
+    setActiveSubtask(null);
+    const subtaskIds = reordered.map(s => s.id).filter(id => !id.startsWith("new-"));
+    const tempSubIdx = reordered.findIndex(s => s.id === active.id);
+    if (tempSubIdx !== -1 && reordered[tempSubIdx].id.startsWith("new-")) return;
+    await Promise.all(
+      reordered.map((s, i) =>
+        fetch(`/api/tasks/${s.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: i }),
+        })
+      )
+    );
+  }, [subtasks]);
+
   return (
     <div>
       <div className="mb-2 flex items-center gap-2">
@@ -277,14 +308,16 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
         )}
       </div>
 
-      <div className="mb-2 space-y-0.5">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={(e) => setActiveSubtask(subtasks.find(s => s.id === e.active.id) ?? null)} onDragEnd={handleDragEnd}>
+        <SortableContext items={subtasks.filter(s => !s.id.startsWith("new-")).map(s => s.id)} strategy={verticalListSortingStrategy}>
+        <div className="mb-2 space-y-0.5">
         {subtasks.map((sub) => {
           const isEditing = editingIds.has(sub.id);
           const isNew = sub.id.startsWith("new-");
           return (
-            <div key={sub.id}>
+            <SortableSubtaskRow key={sub.id} id={sub.id}>
               <div className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-muted/50">
-                <GripVertical className="size-3.5 shrink-0 text-muted-foreground/30 cursor-grab" />
+                <GripVertical className="size-3.5 shrink-0 text-muted-foreground/30 cursor-grab sortable-handle" />
                 <Checkbox
                   checked={!!sub.completed}
                   onCheckedChange={() => handleToggle(sub)}
@@ -411,10 +444,21 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
                   })}
                 </div>
               )}
-            </div>
+            </SortableSubtaskRow>
           );
         })}
       </div>
+      </SortableContext>
+      <DragOverlay>
+        {activeSubtask && (
+          <div className="flex items-center gap-1.5 rounded-md bg-background px-1.5 py-1 shadow-lg border">
+            <GripVertical className="size-3.5 shrink-0 text-muted-foreground/30" />
+            <Checkbox checked={!!activeSubtask.completed} className="size-3.5" />
+            <span className={cn("flex-1 text-sm", activeSubtask.completed && "text-muted-foreground line-through")}>{activeSubtask.name}</span>
+          </div>
+        )}
+      </DragOverlay>
+      </DndContext>
 
       {!hasNewRow && (
         <button
@@ -428,3 +472,19 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
     </div>
   );
 });
+
+function SortableSubtaskRow({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    position: "relative" as const,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}

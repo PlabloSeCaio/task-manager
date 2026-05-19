@@ -26,6 +26,8 @@ import { CalendarDays, User, CheckCircle2, Heart, Link2, Maximize2, Minimize2, M
 import { FileUploader } from "@/components/shared/file-uploader";
 import { SubtaskList } from "@/components/tasks/subtask-list";
 import { cn } from "@/lib/utils";
+import { eventBus } from "@/lib/event-bus";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Task, Comment, Attachment, User as UserType, Section } from "@/types";
 
@@ -63,11 +65,16 @@ export function TaskDetailPanel({
   const [composerFocused, setComposerFocused] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [sortNewest, setSortNewest] = useState(false);
-
-  const titleRef = useRef<HTMLInputElement>(null);
-  const subtaskInputRef = useRef<HTMLInputElement>(null);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStartPos, setMentionStartPos] = useState(0);
+  const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const subtaskInputRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const fetchTask = useCallback(async () => {
     setLoading(true);
@@ -161,6 +168,7 @@ export function TaskDetailPanel({
       });
       await fetchTask();
       onUpdate();
+      eventBus.emit("task:updated");
     } catch (err) {
       console.error("Failed to update task", err);
     }
@@ -183,11 +191,13 @@ export function TaskDetailPanel({
     setComposerText("");
     setSubmittingComment(true);
 
+    const mentionedIds = mentionedUserIds;
+    setMentionedUserIds([]);
     try {
       const res = await fetch(`/api/tasks/${taskId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text }),
+        body: JSON.stringify({ body: text, mentionedUserIds: mentionedIds }),
       });
       const json = await res.json();
       if (json.data) {
@@ -198,6 +208,7 @@ export function TaskDetailPanel({
     } finally {
       setSubmittingComment(false);
       onUpdate();
+      eventBus.emit("comment:created");
     }
   };
 
@@ -224,6 +235,7 @@ export function TaskDetailPanel({
     try {
       await fetch(`/api/tasks/${taskId}/duplicate`, { method: "POST" });
       onUpdate();
+      eventBus.emit("task:created");
     } catch (err) {
       console.error("Failed to duplicate task", err);
     }
@@ -235,6 +247,7 @@ export function TaskDetailPanel({
       await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
       onClose();
       onUpdate();
+      eventBus.emit("task:deleted");
     } catch (err) {
       console.error("Failed to delete task", err);
     }
@@ -346,6 +359,7 @@ export function TaskDetailPanel({
       }
     }
     await fetchTask();
+    eventBus.emit("attachment:created");
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,11 +370,77 @@ export function TaskDetailPanel({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleComposerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setComposerText(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+    if (lastAtIndex !== -1) {
+      const afterAt = textBeforeCursor.slice(lastAtIndex + 1);
+      if (afterAt.length > 0 && !afterAt.includes(" ")) {
+        setMentionQuery(afterAt);
+        setMentionStartPos(lastAtIndex);
+        setMentionSelectedIdx(0);
+        setMentionOpen(true);
+        return;
+      }
+    }
+    setMentionOpen(false);
+    setMentionQuery("");
+  };
+
   const handleComposerKeyDown = (e: React.KeyboardEvent) => {
+    if (mentionOpen) {
+      const filtered = users.filter(u => u.name?.toLowerCase().includes(mentionQuery.toLowerCase()));
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionSelectedIdx(prev => Math.min(prev + 1, filtered.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionSelectedIdx(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        insertMention(filtered[mentionSelectedIdx]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setMentionOpen(false);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleAddComment();
     }
+  };
+
+  const insertMention = (user: UserType | undefined) => {
+    if (!user || !composerRef.current) return;
+    const el = composerRef.current;
+    const cursorPos = el.selectionStart;
+    const textBefore = composerText.slice(0, cursorPos);
+    const textAfter = composerText.slice(cursorPos);
+    const lastAtIndex = textBefore.lastIndexOf("@", cursorPos);
+    if (lastAtIndex === -1) return;
+    const before = textBefore.slice(0, lastAtIndex);
+    const newText = before + user.name + " " + textAfter;
+    setComposerText(newText);
+    setMentionOpen(false);
+    setMentionQuery("");
+    setMentionedUserIds(prev => [...new Set([...prev, user.id])]);
+    const newCursor = lastAtIndex + user.name.length + 1;
+    requestAnimationFrame(() => {
+      if (composerRef.current) {
+        composerRef.current.focus();
+        composerRef.current.selectionStart = composerRef.current.selectionEnd = newCursor;
+      }
+    });
   };
 
   const assignedUser = users.find((u) => u.id === task?.assigneeId);
@@ -709,7 +789,7 @@ export function TaskDetailPanel({
                 {attachments.map((att) => (
                   <div key={att.id} className="rounded-md bg-muted/50 px-3 py-2">
                     {att.contentType?.startsWith("image/") && att.url ? (
-                      <a href={att.url} target="_blank" rel="noreferrer" className="block">
+                      <button type="button" onClick={() => setLightboxSrc(att.url!)} className="block w-full text-left">
                         <img
                           src={att.url}
                           alt={att.filename}
@@ -724,7 +804,7 @@ export function TaskDetailPanel({
                             </span>
                           )}
                         </div>
-                      </a>
+                      </button>
                     ) : att.url ? (
                       <a
                         href={att.url}
@@ -870,7 +950,7 @@ export function TaskDetailPanel({
                 ref={composerRef}
                 placeholder="Add a comment"
                 value={composerText}
-                onChange={(e) => setComposerText(e.target.value)}
+                onChange={handleComposerChange}
                 onFocus={() => setComposerFocused(true)}
                 onKeyDown={handleComposerKeyDown}
                 rows={composerFocused ? 3 : 1}
@@ -879,6 +959,33 @@ export function TaskDetailPanel({
                   composerFocused ? "min-h-[72px]" : "min-h-[20px]"
                 )}
               />
+              {mentionOpen && (
+                <div className="relative">
+                  <div className="absolute bottom-full left-0 mb-1 w-64 rounded-md border bg-popover shadow-lg z-20 max-h-40 overflow-y-auto">
+                    {users
+                      .filter(u => u.name?.toLowerCase().includes(mentionQuery.toLowerCase()))
+                      .slice(0, 8)
+                      .map((u, i) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); insertMention(u); }}
+                          className={cn(
+                            "flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted transition-colors",
+                            i === mentionSelectedIdx && "bg-muted"
+                          )}
+                        >
+                          <Avatar className="size-5">
+                            <AvatarImage src={u.avatarUrl || undefined} />
+                            <AvatarFallback className="text-[8px]">{(u.name || "?").charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="truncate">{u.name}</span>
+                          <span className="ml-auto text-xs text-muted-foreground truncate">{u.email}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
               {composerFocused && (
                 <div className="flex items-center justify-between mt-1.5">
                   <div className="flex items-center gap-1">
@@ -945,6 +1052,9 @@ export function TaskDetailPanel({
           </div>
         )}
       </SheetContent>
+      {lightboxSrc && (
+        <ImageLightbox src={lightboxSrc} open={!!lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
     </Sheet>
   );
 }

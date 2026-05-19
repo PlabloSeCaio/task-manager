@@ -48,6 +48,7 @@ export function TaskCard({ task, users, onClick, onToggleComplete }: TaskCardPro
     <div
       ref={setNodeRef}
       style={style}
+      onClick={onClick}
       className={cn(
         "group rounded-lg border bg-card shadow-sm transition-all hover:shadow-md hover:border-border/80 cursor-pointer overflow-hidden",
         isDragging && "z-50 opacity-50 shadow-lg ring-2 ring-primary/20",
@@ -78,10 +79,7 @@ export function TaskCard({ task, users, onClick, onToggleComplete }: TaskCardPro
           {task.completed && <Check className="size-3" strokeWidth={3} />}
         </button>
 
-        <div
-          className="flex-1 min-w-0"
-          onClick={(e) => { e.stopPropagation(); onClick(); }}
-        >
+        <div className="flex-1 min-w-0">
           <p
             className={cn(
               "text-sm leading-snug",
@@ -139,6 +137,7 @@ export function TaskCard({ task, users, onClick, onToggleComplete }: TaskCardPro
         <div
           {...attributes}
           {...listeners}
+          onClick={(e) => e.stopPropagation()}
           className="mt-0.5 cursor-grab text-muted-foreground/0 hover:text-muted-foreground/30 group-hover:text-muted-foreground/30 touch-none shrink-0 transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">

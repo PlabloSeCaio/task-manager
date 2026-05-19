@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { projectTemplates, categories, type ProjectTemplate } from "@/lib/project-templates"
 import { cn, getProjectUrl } from "@/lib/utils"
+import { eventBus } from "@/lib/event-bus"
 
 type Step = "gallery" | "detail" | "create"
 
@@ -96,6 +97,7 @@ export function NewProjectFlow({ open, onClose }: NewProjectFlowProps) {
       const json = await res.json()
 
       if (res.ok && json.data) {
+        eventBus.emit("project:created")
         onClose()
         router.push(getProjectUrl(json.data.id, json.data.defaultView))
       } else {

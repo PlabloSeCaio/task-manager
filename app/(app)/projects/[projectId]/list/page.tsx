@@ -27,6 +27,7 @@ import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 import { cn } from "@/lib/utils";
 import { useActiveOrg } from "@/components/layout/org-context";
 import { format, isPast, parseISO } from "date-fns";
+import { eventBus } from "@/lib/event-bus";
 import type { Section, Task, User } from "@/types";
 
 function DraggableRow({
@@ -191,6 +192,21 @@ export default function ProjectListView() {
   }, [projectId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    eventBus.on("task:created", fetchData);
+    eventBus.on("task:updated", fetchData);
+    eventBus.on("task:deleted", fetchData);
+    eventBus.on("comment:created", fetchData);
+    eventBus.on("attachment:created", fetchData);
+    return () => {
+      eventBus.off("task:created", fetchData);
+      eventBus.off("task:updated", fetchData);
+      eventBus.off("task:deleted", fetchData);
+      eventBus.off("comment:created", fetchData);
+      eventBus.off("attachment:created", fetchData);
+    };
+  }, [fetchData]);
 
   const handleToggleComplete = useCallback(async (task: Task) => {
     setTasks((prev) =>

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { comments, users } from "@/lib/db/schema";
+import { comments, users, notifications, tasks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-helpers";
@@ -8,6 +8,7 @@ import { getCurrentUserId, getDbUserId, apiError, apiSuccess } from "@/lib/api-h
 const createSchema = z.object({
   body: z.string().min(1),
   htmlBody: z.string().optional(),
+  mentionedUserIds: z.array(z.string().uuid()).optional(),
 });
 
 export async function GET(
@@ -54,6 +55,19 @@ export async function POST(
       .returning();
 
     const [author] = await db.select({ name: users.name, avatarUrl: users.avatarUrl, email: users.email }).from(users).where(eq(users.id, dbUserId)).limit(1);
+
+    if (parsed.mentionedUserIds?.length) {
+      const [taskRow] = await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, id)).limit(1);
+      await db.insert(notifications).values(
+        parsed.mentionedUserIds.map(userId => ({
+          userId,
+          actorId: dbUserId,
+          taskId: id,
+          projectId: taskRow?.projectId,
+          type: "mention",
+        }))
+      );
+    }
 
     return apiSuccess({
       ...comment,
