@@ -57,6 +57,7 @@ export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logoUrl: text("logo_url"),
+  clerkOrganizationId: text("clerk_organization_id").unique(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

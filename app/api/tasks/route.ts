@@ -4,10 +4,9 @@ import { tasks } from "@/lib/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
-import { getCurrentUserId, getDbUserId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, getCurrentOrgId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
-  workspaceId: z.string().uuid(),
   projectId: z.string().uuid().optional(),
   sectionId: z.string().uuid().optional(),
   parentId: z.string().uuid().optional(),
@@ -31,22 +30,22 @@ export async function GET(req: NextRequest) {
 
     const conditions = [];
 
-    if (projectId) conditions.push(eq(tasks.projectId, projectId));
+    if (projectId) {
+      conditions.push(eq(tasks.projectId, projectId));
+    } else {
+      const workspaceId = await getCurrentOrgId();
+      conditions.push(eq(tasks.workspaceId, workspaceId));
+    }
     if (sectionId) conditions.push(eq(tasks.sectionId, sectionId));
     if (assigneeId) conditions.push(eq(tasks.assigneeId, assigneeId));
     if (completed === "true") conditions.push(eq(tasks.completed, true));
     else if (completed === "false") conditions.push(eq(tasks.completed, false));
 
-    const allTasks = conditions.length > 0
-      ? await db
-          .select()
-          .from(tasks)
-          .where(and(...conditions))
-          .orderBy(asc(tasks.position), asc(tasks.createdAt))
-      : await db
-          .select()
-          .from(tasks)
-          .orderBy(asc(tasks.position), asc(tasks.createdAt));
+    const allTasks = await db
+      .select()
+      .from(tasks)
+      .where(and(...conditions))
+      .orderBy(asc(tasks.position), asc(tasks.createdAt));
 
     return apiSuccess(allTasks);
   } catch (error) {
@@ -61,6 +60,7 @@ export async function POST(req: NextRequest) {
   try {
     await getCurrentUserId();
     const dbUserId = await getDbUserId();
+    const workspaceId = await getCurrentOrgId();
     await ensureDefaultWorkspace();
     const body = await req.json();
     const parsed = createSchema.parse(body);
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     const [task] = await db
       .insert(tasks)
       .values({
-        workspaceId: parsed.workspaceId,
+        workspaceId,
         projectId: parsed.projectId,
         sectionId: parsed.sectionId,
         parentId: parsed.parentId,

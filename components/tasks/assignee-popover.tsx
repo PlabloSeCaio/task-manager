@@ -123,10 +123,15 @@ export function AssigneePopover({ value, onChange }: AssigneePopoverProps) {
                 <Avatar className="size-6">
                   <AvatarImage src={u.avatarUrl || undefined} />
                   <AvatarFallback className="text-[10px]">
-                    {u.name?.charAt(0)?.toUpperCase() || "?"}
+                    {(u.name || u.email || "?").charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className="truncate">{u.name || u.email}</span>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm leading-tight">{u.name || u.email.split("@")[0] || "Unnamed"}</span>
+                  {u.name && u.email && (
+                    <span className="text-[11px] text-muted-foreground/60 truncate max-w-[160px]">{u.email}</span>
+                  )}
+                </div>
               </button>
             ))}
         </div>

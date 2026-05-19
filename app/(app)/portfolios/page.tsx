@@ -28,8 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, PieChart } from "lucide-react";
 import type { Portfolio } from "@/types";
-
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000000";
+import { useActiveOrg } from "@/components/layout/org-context";
 
 const colorMap: Record<string, string> = {
   blue: "border-l-blue-500",
@@ -40,6 +39,7 @@ const colorMap: Record<string, string> = {
 };
 
 export default function PortfoliosPage() {
+  const { workspaceId } = useActiveOrg();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -48,7 +48,7 @@ export default function PortfoliosPage() {
 
   const fetchPortfolios = async () => {
     try {
-      const res = await fetch(`/api/portfolios?workspaceId=${WORKSPACE_ID}`);
+      const res = await fetch(`/api/portfolios?workspaceId=${workspaceId}`);
       const json = await res.json();
       if (json.data) setPortfolios(json.data);
     } finally {
@@ -57,15 +57,16 @@ export default function PortfoliosPage() {
   };
 
   useEffect(() => {
+    if (!workspaceId) return;
     fetchPortfolios();
-  }, []);
+  }, [workspaceId]);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     const res = await fetch("/api/portfolios", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: WORKSPACE_ID, name, color }),
+      body: JSON.stringify({ workspaceId, name, color }),
     });
     const json = await res.json();
     if (json.data) {
@@ -75,6 +76,8 @@ export default function PortfoliosPage() {
       await fetchPortfolios();
     }
   };
+
+  if (!workspaceId) return null;
 
   if (loading) {
     return (

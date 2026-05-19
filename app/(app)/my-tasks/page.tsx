@@ -16,6 +16,7 @@ import {
 import { ListChecks, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Task, Project } from "@/types";
+import { useActiveOrg } from "@/components/layout/org-context";
 
 const STATUS_TABS = [
   { value: "", label: "All" },
@@ -24,6 +25,7 @@ const STATUS_TABS = [
 ];
 
 export default function MyTasksPage() {
+  const { workspaceId } = useActiveOrg();
   const [userId, setUserId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -33,6 +35,7 @@ export default function MyTasksPage() {
   const [sortBy, setSortBy] = useState("createdAt");
 
   useEffect(() => {
+    if (!workspaceId) return;
     (async () => {
       try {
         const meRes = await fetch("/api/users/me");
@@ -43,7 +46,7 @@ export default function MyTasksPage() {
 
         const [tasksRes, projectsRes] = await Promise.all([
           fetch(`/api/tasks?assigneeId=${id}&completed=${statusTab}`),
-          fetch("/api/projects?workspaceId=00000000-0000-0000-0000-000000000000"),
+          fetch(`/api/projects?workspaceId=${workspaceId}`),
         ]);
         const tasksJson = await tasksRes.json();
         const projectsJson = await projectsRes.json();
@@ -53,7 +56,7 @@ export default function MyTasksPage() {
         setLoading(false);
       }
     })();
-  }, [statusTab]);
+  }, [statusTab, workspaceId]);
 
   const projectMap = Object.fromEntries(
     projects.map((p) => [p.id, p.name])
@@ -102,6 +105,8 @@ export default function MyTasksPage() {
       );
     }
   };
+
+  if (!workspaceId) return null;
 
   if (loading) {
     return (

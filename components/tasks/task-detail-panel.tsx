@@ -351,7 +351,10 @@ export function TaskDetailPanel({
                           <AvatarImage src={m.avatarUrl || undefined} />
                           <AvatarFallback className="text-[10px]">{m.name?.charAt(0)?.toUpperCase() || "?"}</AvatarFallback>
                         </Avatar>
-                        <span className="text-sm">{m.name}</span>
+                        <div className="flex flex-col items-start">
+                          <span className="text-sm leading-tight">{m.name || m.email.split("@")[0] || "Unnamed"}</span>
+                          {m.name && m.email && <span className="text-[11px] text-muted-foreground/60 truncate max-w-[140px]">{m.email}</span>}
+                        </div>
                       </div>
                       <Button variant="ghost" size="icon-xs" onClick={() => handleRemoveMember(m.id)}>
                         <X className="size-3" />
@@ -842,9 +845,14 @@ function AssigneePopoverContent({
           >
             <Avatar className="size-6">
               <AvatarImage src={u.avatarUrl || undefined} />
-              <AvatarFallback className="text-[10px]">{u.name?.charAt(0)?.toUpperCase() || "?"}</AvatarFallback>
+              <AvatarFallback className="text-[10px]">{(u.name || u.email || "?").charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <span className="truncate">{u.name || u.email}</span>
+            <div className="flex flex-col items-start">
+              <span className="text-sm leading-tight">{u.name || u.email.split("@")[0] || "Unnamed"}</span>
+              {u.name && u.email && (
+                <span className="text-[11px] text-muted-foreground/60 truncate max-w-[160px]">{u.email}</span>
+              )}
+            </div>
           </button>
         ))}
       </div>

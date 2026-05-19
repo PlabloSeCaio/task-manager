@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 import { cn } from "@/lib/utils";
+import { useActiveOrg } from "@/components/layout/org-context";
 import { format, isPast, parseISO } from "date-fns";
 import type { Section, Task, User } from "@/types";
 
@@ -151,6 +152,7 @@ function DraggableRow({
 
 export default function ProjectListView() {
   const params = useParams();
+  const { workspaceId } = useActiveOrg();
   const projectId = params.projectId as string;
   const [sections, setSections] = useState<Section[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -216,7 +218,7 @@ export default function ProjectListView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspaceId: "00000000-0000-0000-0000-000000000000",
+          workspaceId,
           projectId,
           sectionId,
           name,
@@ -337,6 +339,8 @@ export default function ProjectListView() {
     () => tasks.filter((t) => !t.parentId).map((t) => t.id),
     [tasks]
   );
+
+  if (!workspaceId) return null;
 
   if (loading) {
     return (

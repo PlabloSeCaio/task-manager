@@ -31,11 +31,11 @@ import {
 } from "@/components/ui/select";
 import { Plus, FolderKanban } from "lucide-react";
 import type { Project } from "@/types";
-
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000000";
+import { useActiveOrg } from "@/components/layout/org-context";
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const { workspaceId } = useActiveOrg();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -49,7 +49,7 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     try {
       const res = await fetch(
-        `/api/projects?workspaceId=${WORKSPACE_ID}`
+        `/api/projects?workspaceId=${workspaceId}`
       );
       const json = await res.json();
       if (json.data) setProjects(json.data);
@@ -61,8 +61,9 @@ export default function ProjectsPage() {
   };
 
   useEffect(() => {
+    if (!workspaceId) return;
     fetchProjects();
-  }, []);
+  }, [workspaceId]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +74,7 @@ export default function ProjectsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspaceId: WORKSPACE_ID,
+          workspaceId,
           name,
           description,
           color,
@@ -108,6 +109,8 @@ export default function ProjectsPage() {
     orange: "border-l-orange-500",
     teal: "border-l-teal-500",
   };
+
+  if (!workspaceId) return null;
 
   if (loading) {
     return (

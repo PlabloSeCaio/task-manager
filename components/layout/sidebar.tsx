@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { useSidebar } from "@/components/layout/sidebar-context";
+import { useActiveOrg } from "@/components/layout/org-context";
 import { useState, useEffect } from "react";
 import type { Project } from "@/types";
 
@@ -47,16 +48,18 @@ function getProjectInitial(name: string): string {
 export function Sidebar() {
   const pathname = usePathname();
   const { mobileOpen, setMobileOpen } = useSidebar();
+  const { workspaceId } = useActiveOrg();
   const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
-    fetch("/api/projects?workspaceId=00000000-0000-0000-0000-000000000000")
+    if (!workspaceId) return;
+    fetch(`/api/projects?workspaceId=${workspaceId}`)
       .then((res) => res.json())
       .then((json) => {
         if (json.data) setProjects(json.data);
       })
       .catch(() => {});
-  }, []);
+  }, [workspaceId]);
 
   const sidebarContent = (
     <>

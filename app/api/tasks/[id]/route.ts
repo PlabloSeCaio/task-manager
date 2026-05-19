@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
-import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getCurrentOrgId, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(500).optional(),
@@ -55,9 +55,17 @@ export async function PATCH(
 ) {
   try {
     await getCurrentUserId();
+    const workspaceId = await getCurrentOrgId();
     const { id } = await params;
     const body = await req.json();
     const parsed = updateSchema.parse(body);
+
+    const [existing] = await db
+      .select({ workspaceId: tasks.workspaceId })
+      .from(tasks)
+      .where(eq(tasks.id, id));
+    if (!existing) return apiError("Task not found", 404);
+    if (existing.workspaceId !== workspaceId) return apiError("Forbidden", 403);
 
     const updateData: Record<string, unknown> = {};
     if (parsed.name !== undefined) updateData.name = parsed.name;
@@ -112,7 +120,15 @@ export async function DELETE(
 ) {
   try {
     await getCurrentUserId();
+    const workspaceId = await getCurrentOrgId();
     const { id } = await params;
+
+    const [existing] = await db
+      .select({ workspaceId: tasks.workspaceId })
+      .from(tasks)
+      .where(eq(tasks.id, id));
+    if (!existing) return apiError("Task not found", 404);
+    if (existing.workspaceId !== workspaceId) return apiError("Forbidden", 403);
 
     const [deleted] = await db
       .delete(tasks)

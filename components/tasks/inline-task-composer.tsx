@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { CheckCircle, Plus } from "lucide-react";
 import { AssigneePopover } from "@/components/tasks/assignee-popover";
 import { DueDatePopover } from "@/components/tasks/due-date-popover";
+import { useActiveOrg } from "@/components/layout/org-context";
 
 interface InlineTaskComposerProps {
   sectionId: string;
@@ -20,6 +21,7 @@ export function InlineTaskComposer({
   const [name, setName] = useState("");
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [dueOn, setDueOn] = useState<string | null>(null);
+  const { workspaceId } = useActiveOrg();
   const [creating, setCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -32,7 +34,7 @@ export function InlineTaskComposer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspaceId: "00000000-0000-0000-0000-000000000000",
+          workspaceId,
           projectId,
           sectionId,
           name: trimmed,
@@ -51,6 +53,8 @@ export function InlineTaskComposer({
       setCreating(false);
     }
   };
+
+  if (!workspaceId) return null;
 
   if (!open) {
     return (

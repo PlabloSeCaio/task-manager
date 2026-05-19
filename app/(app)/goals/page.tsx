@@ -24,8 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import { Plus, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Goal } from "@/types";
-
-const WORKSPACE_ID = "00000000-0000-0000-0000-000000000000";
+import { useActiveOrg } from "@/components/layout/org-context";
 
 const statusColors: Record<string, string> = {
   green: "bg-green-500",
@@ -34,6 +33,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function GoalsPage() {
+  const { workspaceId } = useActiveOrg();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -42,7 +42,7 @@ export default function GoalsPage() {
 
   const fetchGoals = async () => {
     try {
-      const res = await fetch(`/api/goals?workspaceId=${WORKSPACE_ID}`);
+      const res = await fetch(`/api/goals?workspaceId=${workspaceId}`);
       const json = await res.json();
       if (json.data) setGoals(json.data);
     } finally {
@@ -51,15 +51,16 @@ export default function GoalsPage() {
   };
 
   useEffect(() => {
+    if (!workspaceId) return;
     fetchGoals();
-  }, []);
+  }, [workspaceId]);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     const res = await fetch("/api/goals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: WORKSPACE_ID, name, description }),
+      body: JSON.stringify({ workspaceId, name, description }),
     });
     const json = await res.json();
     if (json.data) {
@@ -69,6 +70,8 @@ export default function GoalsPage() {
       await fetchGoals();
     }
   };
+
+  if (!workspaceId) return null;
 
   if (loading) {
     return (

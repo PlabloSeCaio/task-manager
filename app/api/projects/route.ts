@@ -1,12 +1,11 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { projects, workspaces, workspaceMembers } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { projects } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
-import { getCurrentUserId, getDbUserId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
+import { getCurrentUserId, getDbUserId, getCurrentOrgId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
 
 const createSchema = z.object({
-  workspaceId: z.string().uuid(),
   teamId: z.string().uuid().optional(),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
@@ -21,12 +20,8 @@ export async function GET(req: NextRequest) {
   try {
     await getCurrentUserId();
     const { searchParams } = new URL(req.url);
-    const workspaceId = searchParams.get("workspaceId");
+    const workspaceId = searchParams.get("workspaceId") || (await getCurrentOrgId());
     const archived = searchParams.get("archived");
-
-    if (!workspaceId) {
-      return apiError("workspaceId is required");
-    }
 
     const conditions = [eq(projects.workspaceId, workspaceId)];
     if (archived === "true") {
@@ -53,6 +48,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const dbUserId = await getDbUserId();
+    const workspaceId = await getCurrentOrgId();
     await ensureDefaultWorkspace();
     const body = await req.json();
     const parsed = createSchema.parse(body);
@@ -60,7 +56,7 @@ export async function POST(req: NextRequest) {
     const [project] = await db
       .insert(projects)
       .values({
-        workspaceId: parsed.workspaceId,
+        workspaceId,
         teamId: parsed.teamId,
         ownerId: dbUserId,
         name: parsed.name,

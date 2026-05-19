@@ -28,9 +28,11 @@ import {
 } from "@/components/ui/select";
 import { Plus, FolderKanban } from "lucide-react";
 import type { Portfolio, Project } from "@/types";
+import { useActiveOrg } from "@/components/layout/org-context";
 
 export default function PortfolioDetailPage() {
   const params = useParams();
+  const { workspaceId } = useActiveOrg();
   const portfolioId = params.portfolioId as string;
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -44,7 +46,7 @@ export default function PortfolioDetailPage() {
       const [pfRes, projRes, allRes] = await Promise.all([
         fetch(`/api/portfolios/${portfolioId}`),
         fetch(`/api/portfolios/${portfolioId}/projects`),
-        fetch("/api/projects?workspaceId=00000000-0000-0000-0000-000000000000"),
+        fetch(`/api/projects?workspaceId=${workspaceId}`),
       ]);
       const pfJson = await pfRes.json();
       const projJson = await projRes.json();
@@ -58,8 +60,9 @@ export default function PortfolioDetailPage() {
   };
 
   useEffect(() => {
+    if (!workspaceId) return;
     fetchData();
-  }, [portfolioId]);
+  }, [portfolioId, workspaceId]);
 
   const addProject = async () => {
     if (!selectedProjectId) return;
@@ -76,6 +79,8 @@ export default function PortfolioDetailPage() {
   const availableProjects = allProjects.filter(
     (p) => !projects.find((pp) => pp.id === p.id)
   );
+
+  if (!workspaceId) return null;
 
   if (loading) {
     return (

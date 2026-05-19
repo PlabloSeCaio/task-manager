@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { useActiveOrg } from "@/components/layout/org-context";
 import { cn } from "@/lib/utils";
 import { format, isPast, isThisWeek, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import type { Task, Project, User } from "@/types";
@@ -67,6 +68,7 @@ function getGreeting(): string {
 }
 
 export default function HomePage() {
+  const { workspaceId } = useActiveOrg();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -76,23 +78,21 @@ export default function HomePage() {
   const [taskTab, setTaskTab] = useState<"upcoming" | "overdue" | "completed">("upcoming");
 
   useEffect(() => {
+    if (!workspaceId) return;
     async function init() {
       try {
-        const [meRes, tasksRes, workspacesRes, usersRes] = await Promise.all([
+        const [meRes, tasksRes, usersRes] = await Promise.all([
           fetch("/api/users/me"),
           fetch("/api/tasks"),
-          fetch("/api/workspaces"),
           fetch("/api/users"),
         ]);
 
         const meJson = await meRes.json();
         const tasksJson = await tasksRes.json();
-        const workspacesJson = await workspacesRes.json();
         const usersJson = await usersRes.json();
 
         const me: User | undefined = meJson.data;
         const tasks: Task[] = tasksJson.data || [];
-        const workspaces = workspacesJson.data || [];
         const users: User[] = usersJson.data || [];
 
         setCurrentUser(me || null);
@@ -101,12 +101,9 @@ export default function HomePage() {
 
         if (me) setAllUsers((prev) => (prev.find((u) => u.id === me.id) ? prev : [me, ...prev]));
 
-        const wsId = workspaces.length > 0 ? workspaces[0].id : undefined;
-        if (wsId) {
-          const projRes = await fetch(`/api/projects?workspaceId=${wsId}`);
-          const projJson = await projRes.json();
-          setProjects(projJson.data || []);
-        }
+        const projRes = await fetch(`/api/projects?workspaceId=${workspaceId}`);
+        const projJson = await projRes.json();
+        setProjects(projJson.data || []);
       } catch (err) {
         console.error("Failed to load dashboard", err);
       } finally {
@@ -114,7 +111,7 @@ export default function HomePage() {
       }
     }
     init();
-  }, []);
+  }, [workspaceId]);
 
   const myTasks = useMemo(
     () => allTasks.filter((t) => t.assigneeId === currentUser?.id),

@@ -24,7 +24,7 @@ export async function getDbUserId() {
   const client = await clerkClient();
   const clerkUser = await client.users.getUser(clerkId);
   const email = clerkUser.emailAddresses?.[0]?.emailAddress || `${clerkId}@placeholder.dev`;
-  const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
+  const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email.split("@")[0] || "Unnamed";
 
   const [created] = await db
     .insert(users)
@@ -46,6 +46,31 @@ export async function getDbUserId() {
     .onConflictDoNothing();
 
   return created.id;
+}
+
+/**
+ * Resolve the active organization's workspace ID from the Clerk session.
+ * Falls back to DEFAULT_WORKSPACE_ID if no org is selected (backward compat).
+ */
+export async function getCurrentOrgId(): Promise<string> {
+  const session = await auth();
+  const orgId = session.orgId;
+
+  if (orgId) {
+    const [ws] = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrganizationId, orgId));
+
+    if (ws) return ws.id;
+  }
+
+  return DEFAULT_WORKSPACE_ID;
+}
+
+export async function getCurrentOrgClerkId(): Promise<string | null> {
+  const session = await auth();
+  return session.orgId || null;
 }
 
 export async function ensureDefaultWorkspace() {

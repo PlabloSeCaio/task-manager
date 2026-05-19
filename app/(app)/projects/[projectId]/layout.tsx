@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LayoutList, Columns3, Calendar, GitBranch, Plus } from "lucide-react";
 import { ProjectHeader } from "@/components/projects/project-header";
+import { useActiveOrg } from "@/components/layout/org-context";
 import { AutomationRulesModal } from "@/components/projects/automation-rules-modal";
 import { StatusUpdateForm } from "@/components/projects/status-update-form";
 import type { Project, Section } from "@/types";
@@ -26,6 +27,7 @@ export default function ProjectLayout({
   const params = useParams();
   const pathname = usePathname();
   const router = useRouter();
+  const { workspaceId } = useActiveOrg();
   const projectId = params.projectId as string;
   const [project, setProject] = useState<Project | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -53,7 +55,7 @@ export default function ProjectLayout({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          workspaceId: "00000000-0000-0000-0000-000000000000",
+          workspaceId,
           projectId,
           sectionId: firstSectionId,
           name: "New task",
@@ -64,6 +66,8 @@ export default function ProjectLayout({
       console.error("Failed to create task", err);
     }
   };
+
+  if (!workspaceId) return null;
 
   return (
     <div className="flex h-full flex-col">
