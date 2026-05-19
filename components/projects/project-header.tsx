@@ -13,13 +13,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { cn, getProjectUrl } from "@/lib/utils";
 
 interface ProjectHeaderProps {
   project: Project;
   onUpdate: (updated: Project) => void;
   onOpenRules?: () => void;
   onOpenStatusUpdate?: () => void;
+  onOpenAutomationRules?: () => void;
 }
 
 export function ProjectHeader({
@@ -27,6 +28,7 @@ export function ProjectHeader({
   onUpdate,
   onOpenRules,
   onOpenStatusUpdate,
+  onOpenAutomationRules,
 }: ProjectHeaderProps) {
   const { toast } = useToast();
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -78,7 +80,7 @@ export function ProjectHeader({
   }, [project.name]);
 
   const handleCopyLink = React.useCallback(() => {
-    navigator.clipboard.writeText(`${window.location.origin}/projects/${project.id}/list`);
+    navigator.clipboard.writeText(`${window.location.origin}${getProjectUrl(project.id, project.defaultView)}`);
     toast("Link copied to clipboard", "success");
   }, [project.id, toast]);
 
@@ -186,7 +188,7 @@ export function ProjectHeader({
                 <Link className="size-4" />
                 Copy link
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open(`/projects/${project.id}/list`, "_blank")}>
+              <DropdownMenuItem onClick={() => window.open(getProjectUrl(project.id, project.defaultView), "_blank")}>
                 <ExternalLink className="size-4" />
                 Open in new tab
               </DropdownMenuItem>
@@ -199,9 +201,13 @@ export function ProjectHeader({
                 <Palette className="size-4" />
                 Set color & icon
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setMenuOpen(false); onOpenRules?.(); }}>
+              <DropdownMenuItem onClick={() => { setMenuOpen(false); setSettingsOpen(true); }}>
                 <Settings className="size-4" />
                 Project settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setMenuOpen(false); onOpenRules?.(); }}>
+                <Settings className="size-4" />
+                Automation rules
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleArchive}>
@@ -225,6 +231,7 @@ export function ProjectHeader({
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         onUpdate={onUpdate}
+        onOpenAutomationRules={onOpenAutomationRules}
       />
     </>
   );

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Clock, ChevronRight } from "lucide-react";
 import { ProjectThumbnail } from "@/components/projects/project-thumbnail";
 import { NewProjectFlow } from "@/components/projects/new-project-flow";
-import { cn } from "@/lib/utils";
+import { cn, getProjectUrl } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import type { Project } from "@/types";
 import { useActiveOrg } from "@/components/layout/org-context";
@@ -122,7 +122,7 @@ export default function BrowseProjectsPage() {
                 return (
                   <Link
                     key={project.id}
-                    href={`/projects/${project.id}/list`}
+                    href={getProjectUrl(project.id, project.defaultView)}
                     className="grid grid-cols-[1fr_140px] gap-4 px-4 py-3 items-center transition-colors hover:bg-muted/30 group"
                   >
                     <div className="flex items-center gap-3 min-w-0">

@@ -20,6 +20,7 @@ import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { useActiveOrg } from "@/components/layout/org-context";
 import { cn } from "@/lib/utils";
 import { format, isPast, isThisWeek, startOfWeek, endOfWeek, parseISO } from "date-fns";
+import { getProjectUrl } from "@/lib/utils";
 import type { Task, Project, User } from "@/types";
 
 const projectColorMap: Record<string, string> = {
@@ -432,7 +433,7 @@ export default function HomePage() {
                   {projects.slice(0, 6).map((project, i) => (
                     <Link
                       key={project.id}
-                      href={`/projects/${project.id}/list`}
+                      href={getProjectUrl(project.id, project.defaultView)}
                       className={cn(
                         "flex items-center gap-2.5 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/50",
                       )}

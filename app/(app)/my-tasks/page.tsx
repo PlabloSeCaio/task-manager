@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { getProjectUrl } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -192,7 +193,7 @@ export default function MyTasksPage() {
                       onCheckedChange={() => toggleTask(task)}
                     />
                     <Link
-                      href={`/projects/${task.projectId}/list`}
+                        href={getProjectUrl(task.projectId, null)}
                       className="flex-1 text-sm font-medium hover:underline"
                     >
                       <span

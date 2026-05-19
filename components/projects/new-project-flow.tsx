@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { projectTemplates, categories, type ProjectTemplate } from "@/lib/project-templates"
-import { cn } from "@/lib/utils"
+import { cn, getProjectUrl } from "@/lib/utils"
 
 type Step = "gallery" | "detail" | "create"
 
@@ -97,7 +97,7 @@ export function NewProjectFlow({ open, onClose }: NewProjectFlowProps) {
 
       if (res.ok && json.data) {
         onClose()
-        router.push(`/projects/${json.data.id}/list`)
+        router.push(getProjectUrl(json.data.id, json.data.defaultView))
       } else {
         console.error("Failed to create project", json)
       }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { getProjectUrl } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -149,7 +150,7 @@ export default function PortfolioDetailPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
-            <Link key={project.id} href={`/projects/${project.id}/list`}>
+            <Link key={project.id} href={getProjectUrl(project.id, project.defaultView)}>
               <Card className="cursor-pointer transition-shadow hover:shadow-md">
                 <CardHeader>
                   <CardTitle className="text-lg">{project.name}</CardTitle>

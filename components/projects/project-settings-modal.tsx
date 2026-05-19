@@ -29,6 +29,7 @@ interface ProjectSettingsModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: (updated: Project) => void
+  onOpenAutomationRules?: () => void
 }
 
 export function ProjectSettingsModal({
@@ -36,6 +37,7 @@ export function ProjectSettingsModal({
   open,
   onOpenChange,
   onUpdate,
+  onOpenAutomationRules,
 }: ProjectSettingsModalProps) {
   const { toast } = useToast()
   const [name, setName] = React.useState(project.name)
@@ -219,6 +221,20 @@ export function ProjectSettingsModal({
               })}
             </div>
           </div>
+        </div>
+
+        <div className="border-t pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              onOpenChange(false)
+              onOpenAutomationRules?.()
+            }}
+          >
+            Automation rules
+          </Button>
         </div>
 
         <div className="flex items-center justify-between border-t pt-4">

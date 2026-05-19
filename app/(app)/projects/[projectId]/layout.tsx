@@ -81,6 +81,7 @@ export default function ProjectLayout({
           onUpdate={handleProjectUpdate}
           onOpenRules={() => setRulesOpen(true)}
           onOpenStatusUpdate={() => setStatusOpen(true)}
+          onOpenAutomationRules={() => setRulesOpen(true)}
         />
       )}
 

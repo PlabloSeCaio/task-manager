@@ -34,6 +34,7 @@ import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import { ProjectThumbnail, projectColorPalette, getColorClass } from "@/components/projects/project-thumbnail";
 import { projectIcons, getIconById } from "@/lib/project-icons";
 import { useToast } from "@/lib/toast-context";
+import { getProjectUrl, getProjectViewSlug } from "@/lib/utils";
 import type { Project } from "@/types";
 
 const navTop = [
@@ -59,7 +60,9 @@ export function Sidebar() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const [addDropdownPos, setAddDropdownPos] = useState({ x: 0, y: 0 });
   const [projectsDropdownOpen, setProjectsDropdownOpen] = useState(false);
+  const [projectsDropdownPos, setProjectsDropdownPos] = useState({ x: 0, y: 0 });
   const [sortMode, setSortMode] = useState<SortMode>("alphabetical");
   const [contextMenu, setContextMenu] = useState<{
     project: Project;
@@ -242,9 +245,9 @@ export function Sidebar() {
   );
 
   const handleCopyLink = useCallback(
-    (projectId: string) => {
+    (project: Project) => {
       navigator.clipboard.writeText(
-        `${window.location.origin}/projects/${projectId}/list`
+        `${window.location.origin}${getProjectUrl(project.id, project.defaultView)}`
       );
       toast("Link copied", "success");
       setContextMenu(null);
@@ -302,83 +305,35 @@ export function Sidebar() {
         </div>
 
         <div className="mt-5 mb-1 flex items-center justify-between px-3">
-          <div className="relative">
+          <div>
             <button
               ref={projectsTitleRef}
-              onClick={() => setProjectsDropdownOpen(!projectsDropdownOpen)}
+              onClick={() => {
+                if (projectsTitleRef.current) {
+                  const r = projectsTitleRef.current.getBoundingClientRect();
+                  setProjectsDropdownPos({ x: r.left, y: r.bottom + 4 });
+                }
+                setProjectsDropdownOpen(!projectsDropdownOpen);
+              }}
               className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 hover:text-sidebar-foreground/60 transition-colors cursor-pointer"
             >
               Projects
             </button>
-            {projectsDropdownOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-lg border bg-popover shadow-sm">
-                <button
-                  onClick={() => {
-                    setProjectsDropdownOpen(false);
-                    setNewProjectOpen(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
-                >
-                  <Plus className="size-4 text-muted-foreground" />
-                  <span>New project</span>
-                </button>
-                <Link
-                  href="/projects/browse"
-                  onClick={() => {
-                    setProjectsDropdownOpen(false);
-                    setMobileOpen(false);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                >
-                  <FolderKanban className="size-4 text-muted-foreground" />
-                  <span>Browse projects</span>
-                </Link>
-                <div className="border-t" />
-                {sortOptions.map((opt) => {
-                  const Icon = opt.icon;
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => {
-                        setSortMode(opt.id);
-                        setProjectsDropdownOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
-                    >
-                      <Icon className="size-4 text-muted-foreground" />
-                      <span className="flex-1 text-left">{opt.label}</span>
-                      {sortMode === opt.id && (
-                        <Check className="size-3.5 text-primary" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
-          <div className="relative" ref={addRef}>
+          <div ref={addRef}>
             <button
-              onClick={() => setAddDropdownOpen(!addDropdownOpen)}
+              onClick={() => {
+                if (addRef.current) {
+                  const r = addRef.current.getBoundingClientRect();
+                  setAddDropdownPos({ x: r.left, y: r.bottom + 4 });
+                }
+                setAddDropdownOpen(!addDropdownOpen);
+              }}
               className="flex size-3.5 items-center justify-center text-sidebar-foreground/40 hover:text-sidebar-foreground cursor-pointer"
             >
               <Plus className="size-3.5" />
             </button>
-            {addDropdownOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border bg-popover shadow-sm">
-                <button
-                  onClick={() => {
-                    setAddDropdownOpen(false);
-                    setNewProjectOpen(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
-                >
-                  <FolderKanban className="size-4 text-muted-foreground" />
-                  <span>New project</span>
-                  <ChevronRight className="ml-auto size-3.5 text-muted-foreground" />
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -411,7 +366,7 @@ export function Sidebar() {
                   </div>
                 ) : (
                   <Link
-                    href={`/projects/${project.id}/list`}
+                    href={getProjectUrl(project.id, project.defaultView)}
                     onClick={() => setMobileOpen(false)}
                     onContextMenu={(e) => handleContextMenu(e, project)}
                     className={cn(
@@ -478,6 +433,88 @@ export function Sidebar() {
     <>
       <NewProjectFlow open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
 
+      {/* Projects dropdown (fixed, outside overflow container) */}
+      {projectsDropdownOpen && (
+        <div
+          className="fixed inset-0 z-[60]"
+          onClick={() => setProjectsDropdownOpen(false)}
+        />
+      )}
+      {projectsDropdownOpen && (
+        <div
+          className="fixed z-[70] w-52 overflow-hidden rounded-lg border bg-popover py-1 shadow-sm ring-1 ring-foreground/10"
+          style={{ left: projectsDropdownPos.x, top: projectsDropdownPos.y }}
+        >
+          <button
+            onClick={() => {
+              setProjectsDropdownOpen(false);
+              setNewProjectOpen(true);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <Plus className="size-4 text-muted-foreground" />
+            <span>New project</span>
+          </button>
+          <Link
+            href="/projects/browse"
+            onClick={() => {
+              setProjectsDropdownOpen(false);
+              setMobileOpen(false);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            <FolderKanban className="size-4 text-muted-foreground" />
+            <span>Browse projects</span>
+          </Link>
+          <div className="border-t" />
+          {sortOptions.map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => {
+                  setSortMode(opt.id);
+                  setProjectsDropdownOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                <Icon className="size-4 text-muted-foreground" />
+                <span className="flex-1 text-left">{opt.label}</span>
+                {sortMode === opt.id && (
+                  <Check className="size-3.5 text-primary" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add dropdown (fixed, outside overflow container) */}
+      {addDropdownOpen && (
+        <div
+          className="fixed inset-0 z-[60]"
+          onClick={() => setAddDropdownOpen(false)}
+        />
+      )}
+      {addDropdownOpen && (
+        <div
+          className="fixed z-[70] w-44 overflow-hidden rounded-lg border bg-popover py-1 shadow-sm ring-1 ring-foreground/10"
+          style={{ left: addDropdownPos.x, top: addDropdownPos.y }}
+        >
+          <button
+            onClick={() => {
+              setAddDropdownOpen(false);
+              setNewProjectOpen(true);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+          >
+            <FolderKanban className="size-4 text-muted-foreground" />
+            <span>New project</span>
+            <ChevronRight className="ml-auto size-3.5 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+
       {/* Context menu */}
       {contextMenu && (
         <>
@@ -506,7 +543,7 @@ export function Sidebar() {
                 <button
                   onClick={() => {
                     window.open(
-                      `/projects/${contextMenu.project.id}/list`,
+                      getProjectUrl(contextMenu.project.id, contextMenu.project.defaultView),
                       "_blank"
                     );
                     setContextMenu(null);
@@ -517,7 +554,7 @@ export function Sidebar() {
                   Open in new tab
                 </button>
                 <button
-                  onClick={() => handleCopyLink(contextMenu.project.id)}
+                  onClick={() => handleCopyLink(contextMenu.project)}
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
                 >
                   <LinkIcon className="size-4 text-muted-foreground" />

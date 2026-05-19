@@ -10,7 +10,7 @@ import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import type { Project } from "@/types";
 import { useActiveOrg } from "@/components/layout/org-context";
 import { formatDistanceToNow } from "date-fns";
-import { cn } from "@/lib/utils";
+import { getProjectUrl } from "@/lib/utils";
 
 export default function ProjectsPage() {
   const { workspaceId } = useActiveOrg();
@@ -101,7 +101,7 @@ export default function ProjectsPage() {
               {filtered.map((project) => (
                 <Link
                   key={project.id}
-                  href={`/projects/${project.id}/list`}
+                  href={getProjectUrl(project.id, project.defaultView)}
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30 group"
                 >
                   <ProjectThumbnail
