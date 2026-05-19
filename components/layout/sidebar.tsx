@@ -10,11 +10,14 @@ import {
   Settings,
   Plus,
   X,
+  ChevronRight,
+  FolderKanban,
 } from "lucide-react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { useActiveOrg } from "@/components/layout/org-context";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { NewProjectFlow } from "@/components/projects/new-project-flow";
 import type { Project } from "@/types";
 
 const navTop = [
@@ -50,6 +53,9 @@ export function Sidebar() {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const { workspaceId } = useActiveOrg();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false);
+  const addRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -60,6 +66,16 @@ export function Sidebar() {
       })
       .catch(() => {});
   }, [workspaceId]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addRef.current && !addRef.current.contains(e.target as Node)) {
+        setAddDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const sidebarContent = (
     <>
@@ -114,9 +130,29 @@ export function Sidebar() {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
             Projects
           </span>
-          <Link href="/projects" onClick={() => setMobileOpen(false)}>
-            <Plus className="size-3.5 text-sidebar-foreground/40 hover:text-sidebar-foreground" />
-          </Link>
+          <div className="relative" ref={addRef}>
+            <button
+              onClick={() => setAddDropdownOpen(!addDropdownOpen)}
+              className="flex size-3.5 items-center justify-center text-sidebar-foreground/40 hover:text-sidebar-foreground cursor-pointer"
+            >
+              <Plus className="size-3.5" />
+            </button>
+            {addDropdownOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border bg-popover shadow-sm">
+                <button
+                  onClick={() => {
+                    setAddDropdownOpen(false);
+                    setNewProjectOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <FolderKanban className="size-4 text-muted-foreground" />
+                  <span>New project</span>
+                  <ChevronRight className="ml-auto size-3.5 text-muted-foreground" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-0.5">
@@ -147,16 +183,15 @@ export function Sidebar() {
             );
           })}
           {projects.length === 0 && (
-            <Link
-              href="/projects"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-3 rounded-md px-3 py-1.5 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+            <button
+              onClick={() => setNewProjectOpen(true)}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors cursor-pointer"
             >
               <span className="flex size-5 shrink-0 items-center justify-center rounded border border-dashed border-sidebar-border text-[10px]">
                 <Plus className="size-3" />
               </span>
               <span>Add project</span>
-            </Link>
+            </button>
           )}
         </div>
       </nav>
@@ -186,6 +221,7 @@ export function Sidebar() {
 
   return (
     <>
+      <NewProjectFlow open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
