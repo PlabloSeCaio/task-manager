@@ -9,11 +9,9 @@ import {
   Inbox,
   Settings,
   Plus,
-  ChevronDown,
   X,
 } from "lucide-react";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
-import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { useState, useEffect } from "react";
 import type { Project } from "@/types";
@@ -69,13 +67,20 @@ export function Sidebar() {
         >
           <X className="size-4" />
         </button>
-        <div className="flex-1" />
-        <button className="inline-flex items-center gap-1.5 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1 text-xs font-medium text-sidebar-foreground hover:bg-sidebar-accent/80 transition-colors">
-          <span className="flex size-4 items-center justify-center rounded-full bg-red-500 text-white">
-            <Plus className="size-3" />
-          </span>
-          Create
-        </button>
+        <OrganizationSwitcher
+          appearance={{
+            elements: {
+              organizationSwitcherTrigger: {
+                padding: "2px 6px",
+                borderRadius: "6px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "inherit",
+              },
+              organizationSwitcherTriggerIcon: { width: "16px", height: "16px" },
+            },
+          }}
+        />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-1">
@@ -159,19 +164,6 @@ export function Sidebar() {
             appearance={{
               elements: {
                 userButtonAvatarBox: { width: "24px", height: "24px" },
-              },
-            }}
-          />
-          <OrganizationSwitcher
-            appearance={{
-              elements: {
-                organizationSwitcherTrigger: {
-                  padding: "2px",
-                  borderRadius: "4px",
-                  fontSize: "13px",
-                  color: "inherit",
-                },
-                organizationSwitcherTriggerIcon: { width: "14px", height: "14px" },
               },
             }}
           />
