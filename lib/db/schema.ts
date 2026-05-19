@@ -385,6 +385,26 @@ export const automationRules = pgTable("automation_rules", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// ─── User Settings ─────────────────────────────────────────
+export const userSettings = pgTable("user_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.externalId, { onDelete: "cascade" }),
+  pronouns: text("pronouns"),
+  namePronunciation: text("name_pronunciation"),
+  jobTitle: text("job_title"),
+  department: text("department"),
+  about: text("about"),
+  personalization: jsonb("personalization").default({}),
+  showCertifications: boolean("show_certifications").default(false),
+  outOfOffice: jsonb("out_of_office").default({}),
+  notifications: jsonb("notifications").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ─── Relations ────────────────────────────────────────────
 
 export const workspacesRelations = relations(workspaces, ({ many }) => ({
@@ -397,7 +417,7 @@ export const workspacesRelations = relations(workspaces, ({ many }) => ({
   goals: many(goals),
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   workspaceMemberships: many(workspaceMembers),
   teamMemberships: many(teamMembers),
   ownedProjects: many(projects, { relationName: "projectOwner" }),
@@ -407,6 +427,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   comments: many(comments),
   attachments: many(attachments),
   notifications: many(notifications),
+  settings: one(userSettings, {
+    fields: [users.externalId],
+    references: [userSettings.userId],
+  }),
 }));
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
