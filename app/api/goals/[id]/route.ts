@@ -4,6 +4,7 @@ import { goals } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { parseDateString } from "@/lib/utils";
 
 export async function PATCH(
   req: NextRequest,
@@ -26,9 +27,9 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = { ...parsed };
     if (parsed.startOn !== undefined)
-      updateData.startOn = parsed.startOn ? new Date(parsed.startOn) : null;
+      updateData.startOn = parseDateString(parsed.startOn);
     if (parsed.dueOn !== undefined)
-      updateData.dueOn = parsed.dueOn ? new Date(parsed.dueOn) : null;
+      updateData.dueOn = parseDateString(parsed.dueOn);
 
     const [updated] = await db
       .update(goals)

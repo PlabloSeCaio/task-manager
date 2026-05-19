@@ -4,6 +4,7 @@ import { projects } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { parseDateString } from "@/lib/utils";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -72,8 +73,8 @@ export async function PATCH(
     if (parsed.privacy !== undefined) updateData.privacy = parsed.privacy;
     if (parsed.archived !== undefined) updateData.archived = parsed.archived;
     if (parsed.isStarred !== undefined) updateData.is_starred = parsed.isStarred;
-    if (parsed.startOn !== undefined) updateData.startOn = parsed.startOn ? new Date(parsed.startOn) : null;
-    if (parsed.dueOn !== undefined) updateData.dueOn = parsed.dueOn ? new Date(parsed.dueOn) : null;
+    if (parsed.startOn !== undefined) updateData.startOn = parseDateString(parsed.startOn);
+    if (parsed.dueOn !== undefined) updateData.dueOn = parseDateString(parsed.dueOn);
     updateData.updatedAt = new Date();
 
     const [updated] = await db

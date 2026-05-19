@@ -13,6 +13,15 @@ export function FileUploader({ taskId, onUploadComplete }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -30,7 +39,24 @@ export function FileUploader({ taskId, onUploadComplete }: FileUploaderProps) {
       const presignJson = await presignRes.json();
 
       if (presignJson.error && presignJson.error.includes("not configured")) {
-        console.warn("File storage not configured, skipping upload");
+        if (file.size > 5 * 1024 * 1024) {
+          console.warn("File too large for base64 fallback, skipping");
+          setUploading(false);
+          return;
+        }
+        const dataUrl = await fileToBase64(file);
+        await fetch(`/api/tasks/${taskId}/attachments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            key: "base64",
+            filename: file.name,
+            contentType: file.type || "application/octet-stream",
+            sizeBytes: file.size,
+            url: dataUrl,
+          }),
+        });
+        onUploadComplete();
         setUploading(false);
         return;
       }

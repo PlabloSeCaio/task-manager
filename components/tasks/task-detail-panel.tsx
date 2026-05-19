@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarDays, User, CheckCircle2, Heart, Link2, Maximize2, Minimize2, MoreHorizontal, X, Plus, Paperclip, ChevronDown, Clock, Search, Trash2, Upload } from "lucide-react";
+import { CalendarDays, User, CheckCircle2, Heart, Link2, Maximize2, Minimize2, MoreHorizontal, X, Plus, Paperclip, ChevronDown, Clock, Search, Trash2, Upload, File } from "lucide-react";
 import { FileUploader } from "@/components/shared/file-uploader";
 import { SubtaskList } from "@/components/tasks/subtask-list";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,7 @@ interface TaskDetailPanelProps {
   open: boolean;
   onClose: () => void;
   onUpdate: () => void;
+  onNavigate?: (taskId: string) => void;
 }
 
 export function TaskDetailPanel({
@@ -41,8 +42,10 @@ export function TaskDetailPanel({
   open,
   onClose,
   onUpdate,
+  onNavigate,
 }: TaskDetailPanelProps) {
   const [task, setTask] = useState<Task | null>(null);
+  const [parentTask, setParentTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
@@ -62,6 +65,7 @@ export function TaskDetailPanel({
 
   const fetchTask = useCallback(async () => {
     setLoading(true);
+    setParentTask(null);
     try {
       const [taskRes, commentsRes, attachmentsRes] = await Promise.all([
         fetch(`/api/tasks/${taskId}`),
@@ -75,6 +79,12 @@ export function TaskDetailPanel({
         setTask(taskJson.data);
         setTitle(taskJson.data.name || "");
         setNotes(taskJson.data.notes || "");
+        if (taskJson.data.parentId) {
+          fetch(`/api/tasks/${taskJson.data.parentId}`)
+            .then((r) => r.json())
+            .then((j) => { if (j.data) setParentTask(j.data); })
+            .catch(() => {});
+        }
       }
       if (commentsJson.data) setComments(commentsJson.data);
       if (attachmentsJson.data) setAttachments(attachmentsJson.data);
@@ -249,6 +259,15 @@ export function TaskDetailPanel({
     }
   };
 
+  const fileToBase64 = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (files: FileList) => {
     for (const file of Array.from(files)) {
       try {
@@ -262,7 +281,22 @@ export function TaskDetailPanel({
         });
         const presignJson = await presignRes.json();
         if (presignJson.error && presignJson.error.includes("not configured")) {
-          console.warn("File storage not configured, skipping upload");
+          if (file.size > 5 * 1024 * 1024) {
+            console.warn("File too large for base64 fallback, skipping");
+            continue;
+          }
+          const dataUrl = await fileToBase64(file);
+          await fetch(`/api/tasks/${taskId}/attachments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              key: "base64",
+              filename: file.name,
+              contentType: file.type || "application/octet-stream",
+              sizeBytes: file.size,
+              url: dataUrl,
+            }),
+          });
           continue;
         }
         const { uploadUrl, key } = presignJson.data;
@@ -302,6 +336,17 @@ export function TaskDetailPanel({
   function renderContent(t: Task) {
     return (
       <>
+        {parentTask && (
+          <div className="flex items-center gap-1.5 border-b px-4 py-2 text-sm text-muted-foreground">
+            <button
+              onClick={() => onNavigate?.(parentTask.id)}
+              className="flex items-center gap-1 hover:text-foreground transition-colors"
+            >
+              <ChevronDown className="size-3.5 rotate-90" />
+              <span className="truncate max-w-[200px]">{parentTask.name}</span>
+            </button>
+          </div>
+        )}
         {dragOver && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <div className="rounded-lg border-2 border-dashed border-primary p-8 text-center">
@@ -608,6 +653,7 @@ export function TaskDetailPanel({
               projectId={t.projectId}
               sectionId={t.sectionId}
               onUpdate={onUpdate}
+              onOpenTask={onNavigate}
               ref={subtaskInputRef}
             />
           </div>
@@ -629,13 +675,49 @@ export function TaskDetailPanel({
             {attachments.length > 0 && (
               <div className="mt-3 space-y-2">
                 {attachments.map((att) => (
-                  <div key={att.id} className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
-                    <Paperclip className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="flex-1 truncate text-sm">{att.filename}</span>
-                    {att.sizeBytes && (
-                      <span className="text-xs text-muted-foreground">
-                        {(att.sizeBytes / 1024).toFixed(0)} KB
-                      </span>
+                  <div key={att.id} className="rounded-md bg-muted/50 px-3 py-2">
+                    {att.contentType?.startsWith("image/") && att.url ? (
+                      <a href={att.url} target="_blank" rel="noreferrer" className="block">
+                        <img
+                          src={att.url}
+                          alt={att.filename}
+                          className="max-h-48 w-full rounded object-contain"
+                        />
+                        <div className="mt-1 flex items-center gap-2">
+                          <File className="size-3.5 shrink-0 text-muted-foreground" />
+                          <span className="flex-1 truncate text-xs text-muted-foreground">{att.filename}</span>
+                          {att.sizeBytes && (
+                            <span className="text-xs text-muted-foreground">
+                              {(att.sizeBytes / 1024).toFixed(0)} KB
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    ) : att.url ? (
+                      <a
+                        href={att.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 hover:bg-muted/70 rounded-sm transition-colors"
+                      >
+                        <File className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="flex-1 truncate text-sm">{att.filename}</span>
+                        {att.sizeBytes && (
+                          <span className="text-xs text-muted-foreground">
+                            {(att.sizeBytes / 1024).toFixed(0)} KB
+                          </span>
+                        )}
+                      </a>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="flex-1 truncate text-sm">{att.filename}</span>
+                        {att.sizeBytes && (
+                          <span className="text-xs text-muted-foreground">
+                            {(att.sizeBytes / 1024).toFixed(0)} KB
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}

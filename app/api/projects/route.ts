@@ -4,6 +4,7 @@ import { projects } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentUserId, getDbUserId, getCurrentOrgId, ensureDefaultWorkspace, apiError, apiSuccess } from "@/lib/api-helpers";
+import { parseDateString } from "@/lib/utils";
 
 const createSchema = z.object({
   teamId: z.string().uuid().optional(),
@@ -64,8 +65,8 @@ export async function POST(req: NextRequest) {
         color: parsed.color,
         defaultView: parsed.defaultView,
         privacy: parsed.privacy,
-        startOn: parsed.startOn ? new Date(parsed.startOn) : null,
-        dueOn: parsed.dueOn ? new Date(parsed.dueOn) : null,
+        startOn: parseDateString(parsed.startOn),
+        dueOn: parseDateString(parsed.dueOn),
       })
       .returning();
 

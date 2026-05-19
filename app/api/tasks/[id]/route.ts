@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 import { runAutomations } from "@/lib/automation-engine";
 import { getCurrentUserId, getCurrentOrgId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { parseDateString } from "@/lib/utils";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(500).optional(),
@@ -81,9 +82,9 @@ export async function PATCH(
     if (parsed.position !== undefined) updateData.position = parsed.position;
     if (parsed.liked !== undefined) updateData.liked = parsed.liked;
     if (parsed.startOn !== undefined)
-      updateData.startOn = parsed.startOn ? new Date(parsed.startOn) : null;
+      updateData.startOn = parseDateString(parsed.startOn);
     if (parsed.dueOn !== undefined)
-      updateData.dueOn = parsed.dueOn ? new Date(parsed.dueOn) : null;
+      updateData.dueOn = parseDateString(parsed.dueOn);
     if (parsed.completed !== undefined) {
       updateData.completed = parsed.completed;
       updateData.completedAt = parsed.completed ? new Date() : null;

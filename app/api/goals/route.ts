@@ -4,6 +4,7 @@ import { goals } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getCurrentUserId, apiError, apiSuccess } from "@/lib/api-helpers";
+import { parseDateString } from "@/lib/utils";
 
 const createSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -52,8 +53,8 @@ export async function POST(req: NextRequest) {
         parentGoalId: parsed.parentGoalId,
         name: parsed.name,
         description: parsed.description,
-        startOn: parsed.startOn ? new Date(parsed.startOn) : null,
-        dueOn: parsed.dueOn ? new Date(parsed.dueOn) : null,
+        startOn: parseDateString(parsed.startOn),
+        dueOn: parseDateString(parsed.dueOn),
       })
       .returning();
 

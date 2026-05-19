@@ -471,6 +471,7 @@ export default function ProjectListView() {
       {selectedTaskId && (
         <TaskDetailPanel
           taskId={selectedTaskId}
+          onNavigate={(id) => setSelectedTaskId(id)}
           open={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
           onUpdate={fetchData}

@@ -533,6 +533,7 @@ export default function HomePage() {
       {selectedTaskId && (
         <TaskDetailPanel
           taskId={selectedTaskId}
+          onNavigate={(id) => setSelectedTaskId(id)}
           open={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
           onUpdate={() => {

@@ -4,7 +4,7 @@ import { useState, useEffect, forwardRef } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
 
@@ -14,6 +14,7 @@ interface SubtaskListProps {
   projectId?: string | null;
   sectionId?: string | null;
   onUpdate: () => void;
+  onOpenTask?: (taskId: string) => void;
 }
 
 export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(function SubtaskList({
@@ -22,15 +23,28 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
   projectId,
   sectionId,
   onUpdate,
+  onOpenTask,
 }, ref) {
   const [subtasks, setSubtasks] = useState<Task[]>([]);
+  const [subSubtasksMap, setSubSubtasksMap] = useState<Record<string, Task[]>>({});
   const [newName, setNewName] = useState("");
 
   const fetchSubtasks = async () => {
     try {
       const res = await fetch(`/api/tasks/${taskId}/subtasks`);
       const json = await res.json();
-      if (json.data) setSubtasks(json.data);
+      if (json.data) {
+        setSubtasks(json.data);
+        const map: Record<string, Task[]> = {};
+        await Promise.all(json.data.map(async (sub: Task) => {
+          try {
+            const subRes = await fetch(`/api/tasks/${sub.id}/subtasks`);
+            const subJson = await subRes.json();
+            if (subJson.data) map[sub.id] = subJson.data;
+          } catch {}
+        }));
+        setSubSubtasksMap(map);
+      }
     } catch (err) {
       console.error("Failed to fetch subtasks", err);
     }
@@ -86,7 +100,38 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
     }
   };
 
-  const completed = subtasks.filter((s) => s.completed).length;
+  const handleSubToggle = async (subSub: Task) => {
+    try {
+      await fetch(`/api/tasks/${subSub.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !subSub.completed }),
+      });
+      await fetchSubtasks();
+      onUpdate();
+    } catch (err) {
+      console.error("Failed to toggle sub-subtask", err);
+    }
+  };
+
+  const handleSubDelete = async (subSubId: string) => {
+    try {
+      await fetch(`/api/tasks/${subSubId}`, { method: "DELETE" });
+      await fetchSubtasks();
+      onUpdate();
+    } catch (err) {
+      console.error("Failed to delete sub-subtask", err);
+    }
+  };
+
+  const completed = subtasks.reduce((acc, s) => {
+    const subSubs = subSubtasksMap[s.id] || [];
+    const subCompleted = subSubs.filter((ss) => ss.completed).length;
+    return acc + (s.completed ? 1 : 0) + subCompleted;
+  }, 0);
+  const total = subtasks.reduce((acc, s) => {
+    return acc + 1 + (subSubtasksMap[s.id] || []).length;
+  }, 0);
 
   return (
     <div>
@@ -94,37 +139,71 @@ export const SubtaskList = forwardRef<HTMLInputElement, SubtaskListProps>(functi
         <h4 className="text-sm font-medium">Subtasks</h4>
         {subtasks.length > 0 && (
           <span className="text-xs text-muted-foreground">
-            {completed}/{subtasks.length}
+            {completed}/{total}
           </span>
         )}
       </div>
 
-      <div className="mb-2 space-y-1">
+      <div className="mb-2 space-y-0.5">
         {subtasks.map((sub) => (
-          <div
-            key={sub.id}
-            className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
-          >
-            <Checkbox
-              checked={!!sub.completed}
-              onCheckedChange={() => handleToggle(sub)}
-            />
-            <span
-              className={cn(
-                "flex-1 text-sm",
-                sub.completed && "text-muted-foreground line-through"
-              )}
-            >
-              {sub.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 opacity-0 group-hover:opacity-100"
-              onClick={() => handleDelete(sub.id)}
-            >
-              <Trash2 className="size-3 text-muted-foreground" />
-            </Button>
+          <div key={sub.id}>
+            <div className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+              <Checkbox
+                checked={!!sub.completed}
+                onCheckedChange={() => handleToggle(sub)}
+              />
+              <span
+                className={cn(
+                  "flex-1 text-sm cursor-pointer",
+                  sub.completed && "text-muted-foreground line-through"
+                )}
+                onClick={() => onOpenTask?.(sub.id)}
+              >
+                {sub.name}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 opacity-0 group-hover:opacity-100"
+                onClick={() => handleDelete(sub.id)}
+              >
+                <Trash2 className="size-3 text-muted-foreground" />
+              </Button>
+            </div>
+
+            {(subSubtasksMap[sub.id] || []).length > 0 && (
+              <div className="ml-6 border-l border-border/50 pl-3">
+                {(subSubtasksMap[sub.id] || []).map((subSub) => (
+                  <div
+                    key={subSub.id}
+                    className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+                  >
+                    <Checkbox
+                      checked={!!subSub.completed}
+                      onCheckedChange={() => handleSubToggle(subSub)}
+                    />
+                    <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+                    <span
+                      className={cn(
+                        "flex-1 text-sm cursor-pointer",
+                        subSub.completed && "text-muted-foreground line-through"
+                      )}
+                      onClick={() => onOpenTask?.(subSub.id)}
+                    >
+                      {subSub.name}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-6 opacity-0 group-hover:opacity-100"
+                      onClick={() => handleSubDelete(subSub.id)}
+                    >
+                      <Trash2 className="size-3 text-muted-foreground" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
