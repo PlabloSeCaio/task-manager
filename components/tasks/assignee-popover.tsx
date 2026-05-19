@@ -46,23 +46,20 @@ export function AssigneePopover({ value, onChange }: AssigneePopoverProps) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
-          title="Assign"
-        >
-          {assignedUser ? (
-            <Avatar className="size-5">
-              <AvatarImage src={assignedUser.avatarUrl || undefined} />
-              <AvatarFallback className="text-[9px]">
-                {assignedUser.name?.charAt(0)?.toUpperCase() || "?"}
-              </AvatarFallback>
-            </Avatar>
-          ) : (
-            <UserPlus className="size-3.5" />
-          )}
-        </button>
+      <PopoverTrigger
+        className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
+        title="Assign"
+      >
+        {assignedUser ? (
+          <Avatar className="size-5">
+            <AvatarImage src={assignedUser.avatarUrl || undefined} />
+            <AvatarFallback className="text-[9px]">
+              {assignedUser.name?.charAt(0)?.toUpperCase() || "?"}
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <UserPlus className="size-3.5" />
+        )}
       </PopoverTrigger>
       <PopoverContent
         side="bottom"

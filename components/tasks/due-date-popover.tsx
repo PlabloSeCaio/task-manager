@@ -34,17 +34,14 @@ export function DueDatePopover({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors",
-            value && "text-primary"
-          )}
-          title="Due date"
-        >
-          <CalendarDays className="size-3.5" />
-        </button>
+      <PopoverTrigger
+        className={cn(
+          "flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors",
+          value && "text-primary"
+        )}
+        title="Due date"
+      >
+        <CalendarDays className="size-3.5" />
       </PopoverTrigger>
       <PopoverContent
         side="bottom"
